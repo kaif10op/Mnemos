@@ -199,7 +199,7 @@
     // Get share token from URL query params (?token=xxx)
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
-    const API_BASE_URL = localStorage.getItem('notesaver_api_base_url') || 'http://localhost:5050/api';
+    const API_BASE_URL = localStorage.getItem('notesaver_api_base_url') || '/api';
 
     async function loadSharedNote() {
       // Validate token exists

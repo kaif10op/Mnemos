@@ -728,8 +728,12 @@
           <h3 style="margin-bottom: 8px;">Share Note</h3>
           <p style="color: var(--text-tertiary); font-size: 14px;">Create a read-only link for others.</p>
           <button class="btn btn-primary" id="modal-create-share" style="width: 100%; margin-top: 16px;">Create Link</button>
-          <div id="share-result" style="display:none; margin-top: 16px;">
-            <input type="text" id="share-link-input" readonly style="width:100%; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); font-size: 12px;"/>
+          <div id="share-result" style="display:none; margin-top: 16px; text-align: left;">
+            <p style="font-size: 12px; margin-bottom: 4px; color: var(--text-secondary);">Public Link:</p>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="share-link-input" readonly style="flex: 1; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); font-size: 12px;"/>
+              <button class="btn btn-secondary" id="modal-copy-share" style="padding: 8px;"><i class="ph-bold ph-copy"></i> Copy</button>
+            </div>
           </div>
         </div>
       `;
@@ -747,6 +751,13 @@
           const data = await res.json();
           document.getElementById('share-result').style.display = 'block';
           document.getElementById('share-link-input').value = data.url;
+          btn.style.display = 'none'; // Hide create button after success
+          
+          document.getElementById('modal-copy-share').onclick = () => {
+            navigator.clipboard.writeText(data.url);
+            window.showToast('Link copied to clipboard!', 'success');
+            window.closeModal();
+          };
         } catch (e) { window.showToast('Failed to share', 'danger'); }
       };
     },

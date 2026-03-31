@@ -11,6 +11,9 @@ const crypto = require('crypto');
 
 const { Readable } = require('stream');
 
+const mongoose = require('mongoose');
+const { Readable } = require('stream');
+
 // ✅ PERFORMANCE: In-Memory Sync Cache (Fingerprint Cache)
 const statusCache = new Map();
 
@@ -28,8 +31,13 @@ const upload = multer({
 // @access  Public
 router.get('/image/:filename', async (req, res) => {
   try {
-    const bucket = req.app.get('gridfsBucket');
-    if (!bucket) return res.status(500).json({ msg: 'Database storage not initialized' });
+    // ✅ SERVERLESS: Wait for MongoDB connection to lock in on cold start
+    while (mongoose.connection.readyState !== 1) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    // Natively construct bucket after connection is guaranteed
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
 
     // ✅ PERFORMANCE: Find file metadata first (Uses index)
     const files = await bucket.find({ filename: req.params.filename }).limit(1).toArray();
@@ -59,8 +67,10 @@ router.get('/image/:filename', async (req, res) => {
 // @access  Private
 router.delete('/image/:filename', auth, async (req, res) => {
   try {
-    const bucket = req.app.get('gridfsBucket');
-    if (!bucket) return res.status(500).json({ msg: 'Database storage not initialized' });
+    while (mongoose.connection.readyState !== 1) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
 
     // Find the file to verify ownership (optional but Pro)
     const files = await bucket.find({ filename: req.params.filename }).toArray();
@@ -80,14 +90,16 @@ router.delete('/image/:filename', auth, async (req, res) => {
 // @route   POST api/sync/upload
 // @desc    Upload an image for a note
 // @access  Private
-router.post('/upload', auth, upload.single('image'), (req, res) => {
+router.post('/upload', auth, upload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ msg: 'No file uploaded' });
   }
 
   try {
-    const bucket = req.app.get('gridfsBucket');
-    if (!bucket) throw new Error('GridFS Bucket not initialized');
+    while (mongoose.connection.readyState !== 1) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
 
     // Generate professional random filename
     const filename = crypto.randomBytes(16).toString('hex') + path.extname(req.file.originalname);
