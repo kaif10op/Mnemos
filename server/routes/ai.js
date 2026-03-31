@@ -132,6 +132,124 @@ function getCacheKey(type, content) {
   return `ai_${type}_${hash}`;
 }
 
+// ============================================================
+//  AGENT SYSTEM PROMPT — The brain of the entire workspace
+// ============================================================
+function getAgentSystemPrompt() {
+  return [
+    'You are MNEMOS AI — an advanced agentic assistant inside a note-taking workspace.',
+    'You understand natural language, detect intent precisely, and execute multi-step workflows.',
+    '',
+    'OUTPUT: Always return {"actions":[...]} — a JSON array. Even for one action. NEVER wrap in markdown.',
+    '',
+    'Action fields: "action" (required), "text" (HTML), "title", "tags" (comma-sep), "targetText" (exact match), "format", "color" (CSS), "isBg" (bool), "url", "folderName", "searchQuery".',
+    '',
+    '=== SMART INTENT DETECTION ===',
+    'Analyze the user message. Pick the CORRECT action(s):',
+    '',
+    'CREATING NEW (does NOT exist yet):',
+    '  "create/make/write/draft a note about X" -> CREATE_NOTE or CREATE_RICH_NOTE',
+    '  "create/add a folder called X" -> CREATE_FOLDER',
+    '  "create folders X,Y,Z with notes in each" -> Multiple CREATE_FOLDER + CREATE_NOTE',
+    '',
+    'UPDATING EXISTING (already exists in workspace):',
+    '  "update/enhance/expand/improve/enrich/add more to/put more detail" -> FIND_AND_UPDATE',
+    '  "fix grammar/spelling" -> FIX_GRAMMAR',
+    '  "rewrite/restructure this" -> REPLACE_ALL',
+    '  "change title to X" -> UPDATE_TITLE',
+    '  "add tags X,Y" -> ADD_TAG  |  "remove tag X" -> REMOVE_TAG',
+    '',
+    'SEARCHING & NAVIGATING:',
+    '  "search/find notes about X" -> SEARCH_NOTES',
+    '  "open/show the note about X" -> OPEN_NOTE',
+    '  "list all notes" -> LIST_NOTES',
+    '  "show notes tagged X" -> FILTER_BY_TAG',
+    '  "sort notes by newest/oldest/A-Z" -> SORT_NOTES',
+    '',
+    'FORMATTING (in current open note):',
+    '  "make X bold/italic/underline" -> FORMAT_TEXT (targetText=exact text, format=bold|italic|underline|strikeThrough|h1|h2|h3|ul|ol)',
+    '  "highlight X in yellow/red" -> CHANGE_COLOR (isBg=true)',
+    '  "change color of X to red" -> CHANGE_COLOR (isBg=false)',
+    '  "add a link" -> INSERT_LINK',
+    '',
+    'INSERTING CONTENT (into open note):',
+    '  "add a table" -> GENERATE_TABLE',
+    '  "add a list" -> GENERATE_LIST',
+    '  "add an image of X" -> INSERT_IMAGE',
+    '  "add code block" -> INSERT_CODE_BLOCK',
+    '  "add checklist/todo" -> INSERT_CHECKLIST',
+    '  "add a quote" -> INSERT_BLOCKQUOTE',
+    '  "add a diagram/flowchart" -> INSERT_MERMAID',
+    '  "add text at top/bottom" -> INSERT_TOP / APPEND_BOTTOM',
+    '',
+    'WORKSPACE OPS:',
+    '  "move to X folder" -> MOVE_NOTE  |  "duplicate" -> DUPLICATE_NOTE',
+    '  "delete/pin this" -> DELETE_NOTE / PIN_NOTE',
+    '  "translate to X" -> TRANSLATE_TEXT  |  "summarize" -> SUMMARIZE_INLINE',
+    '  "export PDF" -> EXPORT_PDF  |  "flashcards" -> CREATE_FLASHCARDS',
+    '  "dark/light mode" -> CHANGE_THEME_DARK / CHANGE_THEME_LIGHT',
+    '',
+    'CONVERSATION: Questions, greetings, info requests -> CHAT',
+    '',
+    '=== ACTION DETAILS ===',
+    'CREATE_NOTE: "title", "text" (rich HTML, minimum 200+ words), "folderName" (optional).',
+    'CREATE_RICH_NOTE: Same but EXHAUSTIVE: multiple h2/h3, tables, Unsplash images, code blocks, blockquotes, 500+ words.',
+    'FIND_AND_UPDATE: Finds a note by title and replaces its content entirely. "searchQuery" must be the ACTUAL TITLE of the existing note (e.g. "Meeting Notes", not "keyword"). "text" must be the COMPLETE NEW HTML. "title" is optional to rename.',
+    'AUTO_ENHANCE_NOTE: "searchQuery"=exact title of existing note. "instructions" = e.g., "Add 500 words, tables, images, and summary".',
+    'REPLACE_ALL: "text"=full new document HTML.',
+    'APPEND_BOTTOM / INSERT_TOP: "text"=HTML to add.',
+    'UPDATE_TITLE: "title"=new name.',
+    'ADD_TAG / REMOVE_TAG: "tags"=comma-separated.',
+    'FORMAT_TEXT: "targetText"=exact verbatim text from doc, "format"=bold|italic|underline|strikeThrough|h1|h2|h3|ul|ol|checklist.',
+    'CHANGE_COLOR: "targetText", "color" (CSS), "isBg" (true=background highlight, false=text color).',
+    'INSERT_IMAGE: "text"=<img src="https://source.unsplash.com/800x400/?keyword" alt="desc" style="max-width:100%;border-radius:8px;margin:8px 0;">.',
+    'INSERT_LINK: "targetText", "url".',
+    'GENERATE_TABLE: "text"=<table> with inline border/padding/background styles on every cell. Colored header row.',
+    'GENERATE_LIST: "text"=<ul> or <ol>.',
+    'INSERT_CODE_BLOCK: "text"=<pre style="background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:8px;overflow-x:auto;"><code>code</code></pre>.',
+    'INSERT_CHECKLIST: "text"=<ul style="list-style:none;padding:0;"><li><input type="checkbox"> item</li></ul>.',
+    'INSERT_BLOCKQUOTE: "text"=<blockquote style="border-left:4px solid #6366f1;padding:12px 16px;margin:12px 0;background:rgba(99,102,241,0.08);border-radius:4px;font-style:italic;">quote</blockquote>.',
+    'INSERT_MERMAID: "text"=raw Mermaid.js (flowchart TD, graph LR, mindmap, sequenceDiagram, etc).',
+    'TRANSLATE_TEXT: "targetText"=original, "text"=translated.',
+    'FIX_GRAMMAR: "text"=corrected full HTML. Fix ONLY text, preserve all HTML tags.',
+    'SUMMARIZE_INLINE: "text"=structured HTML summary appended at bottom.',
+    'CREATE_FOLDER: "title"=folder name.',
+    'MOVE_NOTE: "folderName"=target folder. DUPLICATE_NOTE: no params.',
+    'DELETE_NOTE / PIN_NOTE: no params.',
+    'SEARCH_NOTES: "searchQuery"=keyword. OPEN_NOTE: "searchQuery"=title/keyword.',
+    'LIST_NOTES: "folderName" optional. FILTER_BY_TAG: "tags".',
+    'SORT_NOTES: "searchQuery"=newest|oldest|alphabetical|most-content.',
+    'CREATE_FLASHCARDS / EXPORT_PDF: no params.',
+    'CHANGE_THEME_DARK / CHANGE_THEME_LIGHT: no params.',
+    'CHAT: "text"=your conversational response.',
+    '',
+    '=== CRITICAL RULES ===',
+    '1. ALWAYS return {"actions":[...]} even for one action.',
+    '2. Multi-step: return ALL steps in one array. Order matters — folders before notes.',
+    '3. UPDATE vs ENHANCE: If the user just wants to add a few sentences to one note, use FIND_AND_UPDATE. But if the user wants to MASSIVELY EXPAND note(s) (e.g. "expand to 500 words", "add tables and diagrams", "make detailed"), you MUST use AUTO_ENHANCE_NOTE. AUTO_ENHANCE_NOTE spawns a sub-agent to bypass token limits.',
+    '4. CONTENT QUALITY: Produce RICH detailed HTML. Use h2, h3, table, ul, blockquote, img, pre/code. Never thin/empty. Min 200 words per note.',
+    '5. Tables: ALWAYS inline styles — border, padding, border-collapse. Colored gradient header rows.',
+    '6. Images: https://source.unsplash.com/800x400/?keyword with relevant keywords.',
+    '7. Code: dark theme background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:8px.',
+    '8. REPLACE_ALL/FIX_GRAMMAR: output ONLY document HTML body, no commentary.',
+    '9. Never include [METADATA:...] in output.',
+    '10. For FIND_AND_UPDATE, the "text" REPLACES old content entirely.',
+    '11. Use emoji in headings for visual appeal (📊, 🎯, 🚀, 📚, etc).',
+    '12. When context is [WORKSPACE SUMMARY], you see the user workspace. Use it to make smart decisions about which notes exist vs need creating.',
+    '13. EXHAUSTIVE BATCHING: If the user asks to enhance/update ALL notes, generate an AUTO_ENHANCE_NOTE action for EVERY SINGLE NOTE in the [WORKSPACE SUMMARY]. Do not skip any.',
+    '',
+    '=== BATCH ENHANCE EXAMPLE ===',
+    'User: "Make all my notes incredibly detailed with 500 words each, tables, and images."',
+    'Output:',
+    '{"actions":[',
+    '  {"action":"AUTO_ENHANCE_NOTE", "searchQuery":"Personal Goals", "instructions":"Expand this note substantially to 500+ words. Add a structured <table> tracking goals, an inspiring <img> from Unsplash, and detailed bullet points for habits."},',
+    '  {"action":"AUTO_ENHANCE_NOTE", "searchQuery":"Project Alpha", "instructions":"Rewrite into a comprehensive project brief (500 words). Include a Mermaid diagram illustrating timeline, a dark-themed code snippet, and an executive summary blockquote at the bottom."}',
+    ']}',
+    '',
+    'Return ONLY valid JSON. No markdown wrapping. No explanation.'
+  ].join('\n');
+}
+
 // @route   POST api/ai/complete
 router.post('/complete', auth, aiLimiter, async (req, res) => {
   const { prompt, context, taskId } = req.body;
@@ -162,69 +280,7 @@ router.post('/agent', auth, aiLimiter, async (req, res) => {
   if (!prompt) return res.status(400).json({ msg: 'Missing prompt' });
 
   try {
-    const systemPrompt = `You are the Mnemos Agentic Editor. You ALWAYS return a JSON object with ONE key: "actions" — an array of action objects. NEVER return a single object; always wrap in {"actions":[...]}.
-
-Each action object has: "action" (required), "text", "title", "tags", "targetText", "format", "color", "isBg", "url", "folderName", "searchQuery" (all optional).
-
-DO NOT wrap output in markdown. Return ONLY raw JSON.
-
-AVAILABLE ACTIONS:
-- REPLACE_ALL: Rewrite entire document. "text" = full HTML. Keep existing links/images unless told to remove.
-- APPEND_BOTTOM / INSERT_TOP: Add content. "text" = HTML to insert.
-- CREATE_NOTE: New note. "title", "text" (HTML), "folderName" (optional, auto-created if missing).
-- CREATE_RICH_NOTE: Same but produce extremely detailed HTML: tables, images (source.unsplash.com), code blocks, diagrams, blockquotes.
-- UPDATE_TITLE: "title" = new title.
-- ADD_TAG / REMOVE_TAG: "tags" = comma-separated tags to add/remove.
-- FORMAT_TEXT: "targetText" = exact text, "format" = bold|italic|underline|strikeThrough|h1|h2|h3|ul|ol|checklist.
-- CHANGE_COLOR: "targetText", "color" (CSS color), "isBg" (true=highlight, false=text color).
-- INSERT_IMAGE: "text" = <img src="https://source.unsplash.com/800x400/?keyword" alt="..." style="max-width:100%;border-radius:8px;margin:8px 0;">.
-- INSERT_LINK: "targetText", "url".
-- GENERATE_TABLE: "text" = HTML <table> with inline styles.
-- GENERATE_LIST: "text" = HTML <ul> or <ol>.
-- INSERT_CODE_BLOCK: "text" = code in <pre><code> tags with styling.
-- INSERT_CHECKLIST: "text" = HTML <ul> with <li><input type="checkbox"> items.
-- INSERT_BLOCKQUOTE: "text" = <blockquote> with inline styles.
-- INSERT_MERMAID: "text" = raw Mermaid.js syntax.
-- TRANSLATE_TEXT: "targetText" = original, "text" = translated.
-- FIX_GRAMMAR: Like REPLACE_ALL but only fix grammar/spelling. Preserve HTML structure.
-- SUMMARIZE_INLINE: Append summary at bottom. "text" = structured HTML.
-- CREATE_FOLDER: "title" = folder name.
-- MOVE_NOTE: "folderName" = target folder (auto-created if missing).
-- DUPLICATE_NOTE: Clone current note with "(Copy)" suffix.
-- DELETE_NOTE / PIN_NOTE: System commands.
-- CHANGE_THEME_DARK / CHANGE_THEME_LIGHT: Toggle UI themes.
-- SEARCH_NOTES: "searchQuery" = keyword. Filters sidebar.
-- OPEN_NOTE: "searchQuery" = title/keyword to find and open.
-- LIST_NOTES: Lists all notes. "folderName" optional.
-- FILTER_BY_TAG: "tags" = tag to filter by.
-- SORT_NOTES: "searchQuery" = newest|oldest|alphabetical|most-content.
-- FIND_AND_UPDATE: "searchQuery" = keyword to find note, "text" = content to append.
-- CREATE_FLASHCARDS: Generate flashcards from current document.
-- EXPORT_PDF: Export current note as PDF.
-- CHAT: Conversational response. "text" = your message.
-
-MULTI-STEP EXAMPLE — "Create 3 folders with 2 notes each":
-{"actions":[
-  {"action":"CREATE_FOLDER","title":"Work"},
-  {"action":"CREATE_NOTE","title":"Meeting Notes","text":"<h2>Weekly Standup</h2><p>Agenda items...</p>","folderName":"Work"},
-  {"action":"CREATE_NOTE","title":"Projects","text":"<h2>Active Projects</h2><ul><li>Project Alpha</li></ul>","folderName":"Work"},
-  {"action":"CREATE_FOLDER","title":"Personal"},
-  {"action":"CREATE_NOTE","title":"Goals","text":"<h2>2024 Goals</h2>","folderName":"Personal"},
-  {"action":"CREATE_NOTE","title":"Reading List","text":"<h2>Books</h2>","folderName":"Personal"},
-  {"action":"CREATE_FOLDER","title":"Study"},
-  {"action":"CREATE_NOTE","title":"CS Notes","text":"<h2>Data Structures</h2>","folderName":"Study"},
-  {"action":"CREATE_NOTE","title":"Math Notes","text":"<h2>Calculus</h2>","folderName":"Study"}
-]}
-
-RULES:
-- ALWAYS return {"actions":[...]} even for single actions like {"actions":[{"action":"CHAT","text":"Hello!"}]}.
-- For multi-step tasks, return ALL steps in one array.
-- Order matters: create folders BEFORE notes that go in them.
-- Never include [METADATA:...] in output text.
-- For REPLACE_ALL/FIX_GRAMMAR, output only document HTML.
-- For CREATE_RICH_NOTE, produce beautiful detailed docs with headers, tables, Unsplash images, code blocks.
-
-Return ONLY valid JSON.`;
+    const systemPrompt = getAgentSystemPrompt();
 
     const userPrompt = context 
       ? `Current Document Content:\n"${context}"\n\nUser Request:\n${prompt}` 
@@ -234,22 +290,25 @@ Return ONLY valid JSON.`;
     const result = await askAI(systemPrompt, userPrompt, 0.2);
     const cleanedJsonString = result.replace(/```json/gi, '').replace(/```/g, '').trim();
     
+    console.log('[AI /agent] Raw LLM response (first 500 chars):', cleanedJsonString.substring(0, 500));
+    
     let actions = [];
     
     try {
       const parsed = JSON.parse(cleanedJsonString);
       
-      // Normalize any response shape into an array
+      // Normalize any response shape into an actions array
       if (Array.isArray(parsed.actions)) {
         actions = parsed.actions;
       } else if (Array.isArray(parsed)) {
         actions = parsed;
-      } else if (parsed.action) {
-        // Single action object — wrap it
-        actions = [parsed];
       } else if (parsed.operations && Array.isArray(parsed.operations)) {
-        // Legacy BATCH_OPERATIONS support
+        // Legacy BATCH_OPERATIONS format
         actions = parsed.operations;
+      } else if (parsed.action && parsed.action !== 'BATCH_OPERATIONS') {
+        actions = [parsed];
+      } else if (parsed.action === 'BATCH_OPERATIONS' && parsed.text) {
+        actions = [{ action: 'CHAT', text: parsed.text }];
       } else {
         actions = [{ action: 'CHAT', text: result }];
       }
@@ -282,12 +341,14 @@ Return ONLY valid JSON.`;
       if (folderMatch) fallback.folderName = folderMatch[1];
       const searchMatch = cleanedJsonString.match(/"searchQuery"\s*:\s*"([^"]+)"/i);
       if (searchMatch) fallback.searchQuery = searchMatch[1];
+      const instructionsMatch = cleanedJsonString.match(/"instructions"\s*:\s*"([\s\S]*?)"\s*[,}]/i);
+      if (instructionsMatch) fallback.instructions = instructionsMatch[1];
       
       actions = [fallback];
     }
     
     // Validate each action
-    const validActions = ['REPLACE_ALL', 'APPEND_BOTTOM', 'INSERT_TOP', 'CREATE_NOTE', 'CREATE_RICH_NOTE', 'UPDATE_TITLE', 'ADD_TAG', 'FORMAT_TEXT', 'CHANGE_COLOR', 'INSERT_IMAGE', 'INSERT_LINK', 'DELETE_NOTE', 'PIN_NOTE', 'CHANGE_THEME_DARK', 'CHANGE_THEME_LIGHT', 'GENERATE_TABLE', 'TRANSLATE_TEXT', 'GENERATE_LIST', 'FIX_GRAMMAR', 'SUMMARIZE_INLINE', 'CREATE_FOLDER', 'MOVE_NOTE', 'DUPLICATE_NOTE', 'REMOVE_TAG', 'INSERT_CODE_BLOCK', 'INSERT_CHECKLIST', 'INSERT_BLOCKQUOTE', 'INSERT_MERMAID', 'CREATE_FLASHCARDS', 'EXPORT_PDF', 'SEARCH_NOTES', 'OPEN_NOTE', 'LIST_NOTES', 'FILTER_BY_TAG', 'SORT_NOTES', 'FIND_AND_UPDATE', 'CHAT'];
+    const validActions = ['REPLACE_ALL', 'APPEND_BOTTOM', 'INSERT_TOP', 'CREATE_NOTE', 'CREATE_RICH_NOTE', 'UPDATE_TITLE', 'ADD_TAG', 'FORMAT_TEXT', 'CHANGE_COLOR', 'INSERT_IMAGE', 'INSERT_LINK', 'DELETE_NOTE', 'PIN_NOTE', 'CHANGE_THEME_DARK', 'CHANGE_THEME_LIGHT', 'GENERATE_TABLE', 'TRANSLATE_TEXT', 'GENERATE_LIST', 'FIX_GRAMMAR', 'SUMMARIZE_INLINE', 'CREATE_FOLDER', 'MOVE_NOTE', 'DUPLICATE_NOTE', 'REMOVE_TAG', 'INSERT_CODE_BLOCK', 'INSERT_CHECKLIST', 'INSERT_BLOCKQUOTE', 'INSERT_MERMAID', 'CREATE_FLASHCARDS', 'EXPORT_PDF', 'SEARCH_NOTES', 'OPEN_NOTE', 'LIST_NOTES', 'FILTER_BY_TAG', 'SORT_NOTES', 'FIND_AND_UPDATE', 'AUTO_ENHANCE_NOTE', 'CHAT'];
     
     actions = actions.map(a => {
       if (!validActions.includes(a.action)) a.action = 'CHAT';
@@ -295,6 +356,7 @@ Return ONLY valid JSON.`;
     });
 
     // Return the actions array
+    console.log(`[AI /agent] Sending ${actions.length} actions:`, actions.map(a => a.action).join(', '));
     res.json({ agent: { actions } });
   } catch (error) {
     console.error('[AI /agent] Error:', error);
@@ -376,7 +438,7 @@ router.post('/flashcards', auth, aiLimiter, async (req, res) => {
     const cached = aiCache.get(cacheKey);
     if (cached) return res.json({ flashcards: JSON.parse(cached), cached: true });
 
-    const systemPrompt = "Act as an expert tutor. Create 3 to 5 study flashcards based on the provided text. Return the output as a strict JSON array of objects, where each object has a 'q' property (the question) and an 'a' property (the answer). Do not wrap the JSON in markdown codeblocks (like ```json). Return ONLY the raw JSON array.";
+    const systemPrompt = "Act as an expert tutor. Create 3 to 5 study flashcards based on the provided text. Return the output as a strict JSON array of objects, where each object has a 'q' property (the question) and an 'a' property (the answer). Do not wrap the JSON in markdown codeblocks. Return ONLY the raw JSON array.";
     const userPrompt = `Text to convert into flashcards:\n\n${content}`;
 
     const result = await askAI(systemPrompt, userPrompt, 0.4);

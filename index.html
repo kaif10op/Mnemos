@@ -116,6 +116,12 @@
               <i class="ph-bold ph-plus" style="font-size:14px;"></i>
             </button>
           </div>
+          <!-- Permanent All Notes Item -->
+          <div class="nav-item active" data-filter="all" id="all-notes-nav" style="background:var(--bg-tertiary);border-radius:8px;margin-bottom:4px;">
+            <span class="nav-item-icon"><i class="ph-duotone ph-note" style="font-size:16px;color:var(--accent-primary);"></i></span>
+            <span class="nav-item-label" style="font-weight:600;">All Notes</span>
+            <span class="nav-item-count" id="all-notes-count">0</span>
+          </div>
           <div id="folders-list"></div>
         </div>
 
@@ -146,6 +152,33 @@
         </div>
       </div>
     </aside>
+
+    <!-- ══════ GLOBAL AI FLOATING BUTTON ══════ -->
+    <button id="global-ai-fab" title="Talk to Mnemos AI (Ctrl+Space)" aria-label="Open AI Assistant" style="
+      position:fixed; bottom:24px; right:24px; z-index:9998;
+      width:56px; height:56px; border-radius:50%; border:none; cursor:pointer;
+      background:linear-gradient(135deg, #6366f1, #8b5cf6, #a855f7);
+      color:#fff; font-size:24px;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.4), 0 0 0 0 rgba(99,102,241,0.3);
+      display:flex; align-items:center; justify-content:center;
+      transition: transform 0.2s, box-shadow 0.2s;
+      animation: fab-pulse 2s infinite;
+    ">
+      <i class="ph-fill ph-magic-wand"></i>
+    </button>
+
+    <!-- ══════ GLOBAL VOICE MIC BUTTON ══════ -->
+    <button id="global-voice-btn" title="Voice Command (Ctrl+Shift+Space)" aria-label="Voice command" style="
+      position:fixed; bottom:24px; right:92px; z-index:9998;
+      width:48px; height:48px; border-radius:50%; border:none; cursor:pointer;
+      background:linear-gradient(135deg, #10b981, #059669);
+      color:#fff; font-size:20px;
+      box-shadow: 0 4px 16px rgba(16,185,129,0.35);
+      display:flex; align-items:center; justify-content:center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    ">
+      <i class="ph-fill ph-microphone"></i>
+    </button>
 
     <!-- ══════ NOTE LIST ══════ -->
     <section class="notelist" aria-label="Notes list">

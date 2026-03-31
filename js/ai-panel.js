@@ -46,6 +46,7 @@
               <select id="ai-context-select" style="background:var(--bg-tertiary); border:1px solid var(--border-default); border-radius:4px; color:var(--text-secondary); font-size:11px; padding:2px 4px; outline:none;">
                 <option value="note">Note Context</option>
                 <option value="folder">Folder Context</option>
+                <option value="workspace">Workspace</option>
               </select>
               <button class="ai-panel-close" id="ai-panel-close" title="Close Panel">
                 <i class="ph-bold ph-x" style="font-size:16px;"></i>
@@ -183,6 +184,75 @@
           document.getElementById('ai-modal-overlay').style.display = 'none';
         });
       }
+
+      // ── Global AI FAB Button ──
+      const globalFab = document.getElementById('global-ai-fab');
+      if (globalFab) {
+        globalFab.addEventListener('click', () => {
+          this.open();
+          const aiInput = document.getElementById('ai-input');
+          if (aiInput) setTimeout(() => aiInput.focus(), 300);
+        });
+      }
+
+      // ── Global Voice Button ──
+      const globalVoiceBtn = document.getElementById('global-voice-btn');
+      if (globalVoiceBtn) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+          const globalRecognition = new SpeechRecognition();
+          globalRecognition.continuous = false;
+          globalRecognition.interimResults = false;
+          
+          globalRecognition.onstart = () => {
+            globalVoiceBtn.classList.add('recording');
+            globalVoiceBtn.innerHTML = '<i class="ph-fill ph-stop"></i>';
+            window.showToast('🎤 Listening...', 'info');
+          };
+          
+          globalRecognition.onresult = (e) => {
+            const text = e.results[0][0].transcript;
+            // Open the panel and submit directly
+            this.open();
+            useVoiceOutput = true;
+            setTimeout(() => this._handleChatSubmit(text), 400);
+          };
+          
+          globalRecognition.onerror = (e) => {
+            console.error('Voice error:', e);
+            globalVoiceBtn.classList.remove('recording');
+            globalVoiceBtn.innerHTML = '<i class="ph-fill ph-microphone"></i>';
+          };
+          
+          globalRecognition.onend = () => {
+            globalVoiceBtn.classList.remove('recording');
+            globalVoiceBtn.innerHTML = '<i class="ph-fill ph-microphone"></i>';
+          };
+          
+          globalVoiceBtn.addEventListener('click', () => {
+            try { globalRecognition.start(); } catch(err) {}
+          });
+        } else {
+          globalVoiceBtn.style.display = 'none';
+        }
+      }
+
+      // ── Global Keyboard Shortcuts ──
+      document.addEventListener('keydown', (e) => {
+        // Ctrl+Space → Open AI panel
+        if (e.code === 'Space' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+          e.preventDefault();
+          this.open();
+          const aiInput = document.getElementById('ai-input');
+          if (aiInput) setTimeout(() => aiInput.focus(), 300);
+        }
+        // Ctrl+Shift+Space → Start voice recording directly
+        if (e.code === 'Space' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+          e.preventDefault();
+          const gvBtn = document.getElementById('global-voice-btn');
+          if (gvBtn) gvBtn.click();
+        }
+      });
     },
 
     async _handleChatSubmit(query) {
@@ -190,25 +260,26 @@
       const loadingId = this._appendLoading();
       isWaiting = true;
 
-      // Collect Context
+      // Collect Context — auto-detect best mode
       let context = '';
-      const contextMode = document.getElementById('ai-context-select')?.value || 'note';
+      let contextMode = document.getElementById('ai-context-select')?.value || 'note';
+      const currentId = window.Editor ? window.Editor.getCurrentId() : null;
       
-      if (contextMode === 'note') {
+      // Auto-escalate to workspace mode if no note is open
+      if (contextMode === 'note' && !currentId) {
+        contextMode = 'workspace';
+      }
+      
+      if (contextMode === 'note' && currentId) {
         const editorHtml = document.getElementById('editor-body')?.innerHTML || '';
-        const currentId = window.Editor ? window.Editor.getCurrentId() : null;
+        const note = window.Store.getNote(currentId);
         let metadataStr = '';
-        if (currentId) {
-           const note = window.Store.getNote(currentId);
-           if (note) {
-              metadataStr = `[METADATA: Title="${note.title}", Tags="${(note.tags||[]).join(', ')}", Pinned=${note.pinned ? 'true' : 'false'}]\n\n`;
-           }
+        if (note) {
+           metadataStr = `[METADATA: Title="${note.title}", Tags="${(note.tags||[]).join(', ')}", Pinned=${note.pinned ? 'true' : 'false'}]\n\n`;
         }
         context = metadataStr + editorHtml;
       } else if (contextMode === 'folder') {
-        const currentId = window.Editor ? window.Editor.getCurrentId() : null;
         const note = currentId ? window.Store.getNote(currentId) : null;
-        
         if (note && note.folderId) {
            const folderNotes = window.Store.getAllNotes().filter(n => n.folderId === note.folderId);
            context = folderNotes.map(n => `[Note: ${n.title} | Tags: ${(n.tags||[]).join(', ')}]\n${n.content || ''}`).join('\n\n---\n\n');
@@ -216,11 +287,22 @@
            const allNotes = window.Store.getAllNotes();
            context = allNotes.map(n => `[Note: ${n.title} | Tags: ${(n.tags||[]).join(', ')}]\n${n.content || ''}`).join('\n\n---\n\n');
         }
+      } else if (contextMode === 'workspace') {
+        // Workspace mode: provide a compact summary of all notes + folders
+        const allFolders = window.Store.getAllFolders();
+        const allNotes = window.Store.getAllNotes();
+        const folderSummary = allFolders.map(f => `Folder: ${f.name} (${allNotes.filter(n => n.folderId === f.id).length} notes)`).join('\n');
+        const noteSummary = allNotes.slice(0, 30).map(n => {
+           const plainText = window.Store.stripHtml(n.content || '').substring(0, 50).replace(/\n/g, ' ');
+           return `- "${n.title || 'Untitled'}" [tags: ${(n.tags||[]).join(',')}] (snippet: "${plainText}...")`;
+        }).join('\n');
+        context = `[WORKSPACE SUMMARY]\n${allFolders.length} folders, ${allNotes.length} notes total\n\nFolders:\n${folderSummary || 'No folders'}\n\nNotes:\n${noteSummary || 'No notes'}`;
       }
 
       try {
         const token = window.Auth.getToken();
-        const endpoint = contextMode === 'note' ? '/ai/agent' : '/ai/complete';
+        // Always use the agent endpoint for maximum capability
+        const endpoint = '/ai/agent';
         
         // 60 second timeout to prevent infinite hang
         const controller = new AbortController();
@@ -241,7 +323,7 @@
         if (!res.ok) throw new Error('AI failed to respond');
         const data = await res.json();
         
-        if (contextMode === 'note' && data.agent && data.agent.actions) {
+        if (data.agent && data.agent.actions) {
            const actions = data.agent.actions;
            
            // Separate CHAT actions from execution actions
@@ -679,34 +761,88 @@
                 || allNotes.find(n => window.Store.stripHtml(n.content || '').toLowerCase().includes(query));
              
              if (match) {
-                // Open the note first
-                window.Editor.open(match.id);
-                window.NoteList.render();
-                
-                // Apply updates
+                // Build update payload
                 const updates = {};
                 if (title) updates.title = title;
                 if (text) {
-                   // Append the new content to existing
-                   const existingContent = match.content || '';
-                   updates.content = existingContent + '<br><br>' + this._sanitizeAgentHtml(text);
+                   // REPLACE the content entirely with the new rich content
+                   updates.content = this._sanitizeAgentHtml(text);
                 }
                 window.Store.updateNote(match.id, updates);
                 
-                // Refresh the open editor with new content
-                const editorBody = document.getElementById('editor-body');
-                if (editorBody && updates.content) {
-                   editorBody.innerHTML = updates.content;
-                }
-                const editorTitle = document.getElementById('editor-title');
-                if (editorTitle && updates.title) {
-                   editorTitle.value = updates.title;
+                // If this note is currently open in the editor, refresh it live
+                const currentOpenId = window.Editor ? window.Editor.getCurrentId() : null;
+                if (currentOpenId === match.id) {
+                   const editorBody = document.getElementById('editor-body');
+                   if (editorBody && updates.content) editorBody.innerHTML = updates.content;
+                   const editorTitle = document.getElementById('editor-title');
+                   if (editorTitle && updates.title) editorTitle.value = updates.title;
+                   window.Editor._scheduleAutoSave();
                 }
                 
-                window.Editor._scheduleAutoSave();
-                window.showToast(`🤖 Updated note: "${match.title}"`, 'success');
+                window.NoteList.render();
+                window.showToast(`🤖 Updated: "${match.title}"`, 'success');
              } else {
                 window.showToast(`🤖 No note found matching "${query}"`, 'warning');
+             }
+          }
+          return;
+       }
+
+       if (action === 'AUTO_ENHANCE_NOTE') {
+          const query = (payload.searchQuery || '').toLowerCase();
+          const instructions = payload.instructions;
+          if (query && instructions) {
+             const allNotes = window.Store.getAllNotes();
+             const match = allNotes.find(n => (n.title || '').toLowerCase().includes(query))
+                || allNotes.find(n => window.Store.stripHtml(n.content || '').toLowerCase().includes(query));
+             
+             if (match) {
+                // Determine a safe string context for the targeted note
+                let contextStr = `[METADATA: Title="${match.title}"]\n\n${match.content || ''}`;
+                window.showToast(`🤖 AI is enhancing "${match.title}" in the background...`, 'info', 3000);
+                
+                // Spawn a detached async sub-request strictly focused on rewriting this note
+                // Using the same endpoint but explicitly commanding it to replace_all
+                fetch(`${window.API_BASE_URL}/ai/agent`, {
+                   method: 'POST',
+                   headers: {
+                       'Content-Type': 'application/json',
+                       'Authorization': `Bearer ${window.Auth.getToken()}`
+                   },
+                   body: JSON.stringify({
+                       prompt: `ENHANCEMENT TASK: ${instructions}.\n\nOutput your response ONLY as an array containing a single {"action": "FIND_AND_UPDATE"} object replacing the entire note content with the newly enhanced rich HTML.`,
+                       context: contextStr
+                   })
+                }).then(res => res.json()).then(data => {
+                   if (data.agent && data.agent.actions && data.agent.actions.length > 0) {
+                       const updateAction = data.agent.actions.find(a => a.action === 'FIND_AND_UPDATE' || a.action === 'REPLACE_ALL');
+                       if (updateAction && updateAction.text) {
+                           const newHtml = this._sanitizeAgentHtml(updateAction.text);
+                           
+                           // Update store
+                           window.Store.updateNote(match.id, { content: newHtml });
+                           
+                           // If open, refresh live editor
+                           const currentOpenId = window.Editor ? window.Editor.getCurrentId() : null;
+                           if (currentOpenId === match.id) {
+                              const editorBody = document.getElementById('editor-body');
+                              if (editorBody) editorBody.innerHTML = newHtml;
+                              window.Editor._scheduleAutoSave();
+                           }
+                           
+                           window.NoteList.render();
+                           window.showToast(`✅ Successfully enhanced "${match.title}"!`, 'success');
+                       } else {
+                           window.showToast(`⚠️ AI failed to provide valid enhancement format for "${match.title}"`, 'warning');
+                       }
+                   }
+                }).catch(err => {
+                   console.error('Enhancement Sub-Agent Error:', err);
+                   window.showToast(`🧨 Failed to enhance "${match.title}"`, 'error');
+                });
+             } else {
+                window.showToast(`🤖 Couldn't find note "${payload.searchQuery}" to enhance`, 'warning');
              }
           }
           return;
