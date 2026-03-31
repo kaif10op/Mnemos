@@ -35,7 +35,8 @@
 
       const currentId = window.Editor.getCurrentId();
 
-      container.innerHTML = notes.map((note, idx) => {
+      // Use smooth renderer instead of full innerHTML replacement
+      window.Renderer.smartRender(container, notes, (note, idx) => {
         const title = note.title || 'Untitled Note';
         const preview = window.Store.stripHtml(note.content || '').substring(0, 100) || 'No content';
         const date = window.Store.formatDate(note.updatedAt);
@@ -46,6 +47,7 @@
         return `
           <div class="note-card ${note.id === currentId ? 'active' : ''}"
                data-note-id="${note.id}"
+               data-render-key="${note.id}"
                style="animation-delay: ${idx * 30}ms">
             <div class="note-card-header">
               <span class="note-card-title">${this._escapeHtml(title)}</span>
@@ -58,17 +60,25 @@
             </div>
           </div>
         `;
-      }).join('');
-
-      // Bind clicks
-      container.querySelectorAll('.note-card').forEach(card => {
-        card.addEventListener('click', () => {
-          const id = card.dataset.noteId;
-          container.querySelectorAll('.note-card').forEach(c => c.classList.remove('active'));
-          card.classList.add('active');
-          window.Editor.open(id);
-        });
+      }, {
+        keyFn: (note) => note.id,
+        debounce: 100,
+        transition: true
       });
+
+      // Delegate click handler (survives re-renders)
+      if (!this._clickHandlerBound) {
+        container.addEventListener('click', (e) => {
+          const card = e.target.closest('.note-card');
+          if (card) {
+            const id = card.dataset.noteId;
+            container.querySelectorAll('.note-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            window.Editor.open(id);
+          }
+        });
+        this._clickHandlerBound = true;
+      }
 
       window.AppIcons.render();
     },

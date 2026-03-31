@@ -5,9 +5,23 @@ const cors = require('cors');
 
 const app = express();
 
-// Init Middleware
-app.use(cors());
+// ✅ SECURITY: Configure CORS with whitelist
+const corsOptions = {
+  origin: process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',')
+    : ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ extended: false }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Connect Database
 const connectDB = async () => {

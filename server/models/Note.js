@@ -32,9 +32,17 @@ const NoteSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Prevent duplicate syncs with unique user + node ID (if we wanted to use client IDs. For now, clientID is helpful)
+// Add clientId field
 NoteSchema.add({ clientId: { type: String, required: true } });
-// Ensure a user doesn't have multiple notes with the same client ID
+
+// ✅ PERFORMANCE: Add indexes for common queries
+// Primary index: ensure user doesn't have duplicate client IDs
 NoteSchema.index({ userId: 1, clientId: 1 }, { unique: true });
+
+// Secondary indexes for better query performance
+NoteSchema.index({ userId: 1, updatedAt: -1 }); // For sorting by recent
+NoteSchema.index({ userId: 1, tags: 1 }); // For tag filtering
+NoteSchema.index({ userId: 1, folderId: 1 }); // For folder filtering
+NoteSchema.index({ userId: 1, pinned: 1 }); // For pinned notes
 
 module.exports = mongoose.model('Note', NoteSchema);

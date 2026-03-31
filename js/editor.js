@@ -25,9 +25,9 @@
       document.getElementById('editor-active').style.display = 'flex';
       document.getElementById('editor-empty-state').style.display = 'none';
 
-      // Fill fields
+      // Fill fields - ✅ SECURITY: Sanitize HTML content
       document.getElementById('editor-title').value = note.title || '';
-      document.getElementById('editor-body').innerHTML = note.content || '';
+      document.getElementById('editor-body').innerHTML = DOMPurify.sanitize(note.content || '');
       this._renderTags(note.tags);
       this._updatePinButton(note.pinned);
       this._updateStats();

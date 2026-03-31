@@ -34,66 +34,73 @@
       const folders = window.Store.getAllFolders();
       const allCount = window.Store.getAllNotes().length;
 
-      container.innerHTML = `
-        <div class="nav-item active" data-filter="all" id="nav-all-notes">
-          <span class="nav-item-icon"><i class="ph-duotone ph-layers" style="font-size:16px;"></i></span>
-          <span class="nav-item-label">All Notes</span>
-          <span class="nav-item-count">${allCount}</span>
-        </div>
-        ${folders.map(f => {
-          const iconName = ['folder', 'briefcase', 'lightbulb', 'star', 'tag', 'bookmark', 'book', 'layers', 'package'].includes(f.icon) ? f.icon : 'folder';
-          return `
-          <div class="nav-item" data-filter="folder" data-folder-id="${f.id}">
+      // Update "All Notes" count with smooth update
+      let allNotesItem = document.querySelector('.nav-item[data-filter="all"]');
+      if (allNotesItem) {
+        const countEl = allNotesItem.querySelector('.nav-item-count');
+        if (countEl) countEl.textContent = allCount;
+      }
+
+      // Use smooth renderer for folders
+      window.Renderer.smartRender(container, folders, (folder) => {
+        const iconName = ['folder', 'briefcase', 'lightbulb', 'star', 'tag', 'bookmark', 'book', 'layers', 'package'].includes(folder.icon) ? folder.icon : 'folder';
+        return `
+          <div class="nav-item" data-filter="folder" data-folder-id="${folder.id}" data-render-key="folder-${folder.id}">
             <span class="nav-item-icon"><i class="ph-duotone ph-${iconName}" style="font-size:16px;"></i></span>
-            <span class="nav-item-label">${this._escapeHtml(f.name)}</span>
-            <span class="nav-item-count">${window.Store.getNotesCountByFolder(f.id)}</span>
+            <span class="nav-item-label">${this._escapeHtml(folder.name)}</span>
+            <span class="nav-item-count">${window.Store.getNotesCountByFolder(folder.id)}</span>
             <div class="nav-item-actions">
-              <button class="nav-item-action-btn folder-delete-btn" data-folder-id="${f.id}" title="Delete folder" aria-label="Delete folder">
+              <button class="nav-item-action-btn folder-delete-btn" data-folder-id="${folder.id}" title="Delete folder" aria-label="Delete folder">
                 <i class="ph-bold ph-trash" style="font-size:14px;"></i>
               </button>
             </div>
           </div>
-        `}).join('')}
-      `;
+        `;
+      }, {
+        keyFn: (f) => f.id,
+        debounce: 100,
+        transition: true
+      });
 
-      // Bind clicks
-      container.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-          if (e.target.closest('.folder-delete-btn')) return;
-
-          container.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-          item.classList.add('active');
-
-          const filter = item.dataset.filter;
-          if (filter === 'all') {
-            activeFilter = { type: 'all', id: null };
-          } else {
-            activeFilter = { type: 'folder', id: item.dataset.folderId };
+      // Use event delegation for folder clicks (survives re-renders)
+      if (!this._folderClickBound) {
+        container.addEventListener('click', (e) => {
+          const deleteBtn = e.target.closest('.folder-delete-btn');
+          if (deleteBtn) {
+            e.stopPropagation();
+            const fid = deleteBtn.dataset.folderId;
+            window.showConfirm('Delete folder?', 'Notes in this folder will be moved to uncategorized.', () => {
+              window.Store.deleteFolder(fid);
+              if (activeFilter.id === fid) {
+                activeFilter = { type: 'all', id: null };
+              }
+              this.renderFolders();
+              window.NoteList.render();
+              window.showToast('Folder deleted', 'info');
+            });
+            return;
           }
-          activeTag = null;
-          document.querySelectorAll('.tag-chip').forEach(t => t.classList.remove('active'));
 
-          window.NoteList.render();
-          this._closeMobileMenu();
-        });
-      });
+          const item = e.target.closest('.nav-item');
+          if (item) {
+            container.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
 
-      // Bind delete buttons
-      container.querySelectorAll('.folder-delete-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const fid = btn.dataset.folderId;
-          window.showConfirm('Delete folder?', 'Notes in this folder will be moved to uncategorized.', () => {
-            window.Store.deleteFolder(fid);
-            if (activeFilter.id === fid) {
+            const filter = item.dataset.filter;
+            if (filter === 'all') {
               activeFilter = { type: 'all', id: null };
+            } else {
+              activeFilter = { type: 'folder', id: item.dataset.folderId };
             }
-            this.renderFolders();
+            activeTag = null;
+            document.querySelectorAll('.tag-chip').forEach(t => t.classList.remove('active'));
+
             window.NoteList.render();
-            window.showToast('Folder deleted', 'info');
-          });
+            this._closeMobileMenu();
+          }
         });
-      });
+        this._folderClickBound = true;
+      }
 
       window.AppIcons.render();
     },
@@ -108,28 +115,38 @@
         return;
       }
 
-      container.innerHTML = tags.map(tag => `
-        <span class="tag-chip ${activeTag === tag ? 'active' : ''}" data-tag="${tag}">
+      // Use smooth renderer for tags
+      window.Renderer.smartRender(container, tags, (tag) => `
+        <span class="tag-chip ${activeTag === tag ? 'active' : ''}" data-tag="${tag}" data-render-key="tag-${tag}">
           <span class="tag-dot" style="background: ${window.Store.getTagColor(tag)}"></span>
           ${tag}
         </span>
-      `).join('');
-
-      container.querySelectorAll('.tag-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-          const tag = chip.dataset.tag;
-          if (activeTag === tag) {
-            activeTag = null;
-            chip.classList.remove('active');
-          } else {
-            activeTag = tag;
-            container.querySelectorAll('.tag-chip').forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-          }
-          window.NoteList.render();
-          this._closeMobileMenu();
-        });
+      `, {
+        keyFn: (tag) => tag,
+        debounce: 100,
+        transition: true
       });
+
+      // Use event delegation for tag clicks (survives re-renders)
+      if (!this._tagClickBound) {
+        container.addEventListener('click', (e) => {
+          const chip = e.target.closest('.tag-chip');
+          if (chip) {
+            const tag = chip.dataset.tag;
+            if (activeTag === tag) {
+              activeTag = null;
+              chip.classList.remove('active');
+            } else {
+              activeTag = tag;
+              container.querySelectorAll('.tag-chip').forEach(c => c.classList.remove('active'));
+              chip.classList.add('active');
+            }
+            window.NoteList.render();
+            this._closeMobileMenu();
+          }
+        });
+        this._tagClickBound = true;
+      }
 
       window.AppIcons.render();
     },
