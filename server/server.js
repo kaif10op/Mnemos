@@ -17,7 +17,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json({ extended: false }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // ✅ LOGGING: Add request logging middleware
 app.use(requestLogger);
@@ -60,6 +61,8 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/share', require('./routes/share')); // ✅ Sharing endpoints
 
+// ✅ Serve static assets (images, etc)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ✅ Serve frontend static files
 app.use(express.static(path.join(__dirname, '..')));
 

@@ -565,6 +565,50 @@ window.Store = {
   loadMoreNotes, // ✅ Pagination support
 };
 
+/* ── Sync Manager — Smart Background Control ── */
+
+window.SyncManager = {
+  _timer: null,
+  _heartbeat: null,
+  _isInitial: true,
+
+  init() {
+    this.startHeartbeat();
+    this.bindEvents();
+  },
+
+  bindEvents() {
+    // Sync immediately when tab becomes visible
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        this.scheduleBackgroundSync(500); // Quick refresh on focus
+      }
+    });
+  },
+
+  startHeartbeat() {
+    if (this._heartbeat) clearInterval(this._heartbeat);
+    // Polling interval: 60 seconds for background parity
+    this._heartbeat = setInterval(() => {
+      if (document.visibilityState === 'visible' && window.Auth.getToken()) {
+        window.Store.fetchFromCloud();
+      }
+    }, 60000);
+  },
+
+  scheduleBackgroundSync(delay = 2000) {
+    if (!window.Auth.getToken()) return;
+    clearTimeout(this._timer);
+    
+    this._timer = setTimeout(async () => {
+      await window.Store.syncWithCloud();
+    }, delay);
+  }
+};
+
+// Start the Pro Sync engine
+window.SyncManager.init();
+
 /* ── Data Fingerprint Helper ── */
 
 function _buildDataFingerprint(notes, folders) {

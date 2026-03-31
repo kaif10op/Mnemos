@@ -128,6 +128,26 @@
     }
 
     window.ShortcutManager.init();
+
+    // ✅ URL HASH ROUTING: Open note from URL if present
+    const handleHashNavigation = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#note-')) {
+        const id = hash.replace('#note-', '');
+        // Allow a small delay for the Store to populate from cloud/local
+        setTimeout(() => {
+          if (window.Editor && typeof window.Editor.open === 'function') {
+            window.Editor.open(id, true); // true to skip re-setting hash
+          }
+        }, 300);
+      }
+    };
+
+    // Initial load
+    handleHashNavigation();
+
+    // Listen for manual URL changes (Back/Forward)
+    window.addEventListener('hashchange', handleHashNavigation);
   });
 
   // ── Seed Demo Notes ──

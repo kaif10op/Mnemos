@@ -15,6 +15,7 @@
       this._bindBody();
       this._bindActions();
       this._initInteractions();
+      this._initImageManager();
     },
 
     _initInteractions() {
@@ -39,10 +40,15 @@
       });
     },
 
-    open(noteId) {
+    open(noteId, skipHash = false) {
       currentNoteId = noteId;
       const note = window.Store.getNote(noteId);
       if (!note) return;
+
+      // ✅ URL Persistence: Update hash
+      if (!skipHash) {
+        window.location.hash = `#note-${noteId}`;
+      }
 
       // Show editor, hide empty state
       document.getElementById('editor-active').style.display = 'flex';
@@ -57,7 +63,15 @@
 
       // Fill fields - ✅ SECURITY: Sanitize HTML content
       document.getElementById('editor-title').value = note.title || '';
-      document.getElementById('editor-body').innerHTML = DOMPurify.sanitize(note.content || '');
+      
+      // ✅ IMAGE REPAIR: Prepend backend origin if it's a relative /uploads path
+      let content = note.content || '';
+      const baseUrl = window.API_BASE_URL.replace('/api', '');
+      if (content.includes('src="/uploads/')) {
+        content = content.replaceAll('src="/uploads/', `src="${baseUrl}/uploads/`);
+      }
+
+      document.getElementById('editor-body').innerHTML = DOMPurify.sanitize(content);
       this._renderTags(note.tags);
       this._updatePinButton(note.pinned);
       this._updateStats();
@@ -149,15 +163,33 @@
       const imgInput = document.getElementById('image-upload-input');
       if (insertImgBtn && imgInput) {
         insertImgBtn.addEventListener('click', () => imgInput.click());
-        imgInput.addEventListener('change', (e) => {
+        imgInput.addEventListener('change', async (e) => {
           const file = e.target.files[0];
           if (file) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-              document.execCommand('insertImage', false, ev.target.result);
+            try {
+              const formData = new FormData();
+              formData.append('image', file);
+              
+              const token = window.Auth.getToken();
+              const res = await fetch(`${window.API_BASE_URL}/sync/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+              });
+              
+              if (!res.ok) throw new Error('Upload failed');
+              const data = await res.json();
+              
+              // ✅ FIXED: Standardized absolute path for images
+              const baseUrl = window.API_BASE_URL.replace('/api', '');
+              const fullUrl = `${baseUrl}${data.url}`;
+              
+              document.execCommand('insertImage', false, fullUrl);
               this._scheduleAutoSave();
-            };
-            reader.readAsDataURL(file);
+              window.showToast('🖼️ Image uploaded successfully', 'success');
+            } catch (err) {
+              window.showToast('Upload failed: ' + err.message, 'danger');
+            }
           }
           imgInput.value = '';
         });
@@ -244,6 +276,15 @@
         });
 
         body.addEventListener('mouseup', () => this._updateToolbarState());
+
+        // ✅ Image Selection Handling
+        body.addEventListener('click', (e) => {
+          if (e.target.tagName === 'IMG') {
+            this._handleImageClick(e.target);
+          } else {
+            this._hideImageToolbar();
+          }
+        });
       }
     },
 
@@ -649,6 +690,74 @@
       html += '</table><p>&nbsp;</p>';
       document.getElementById('editor-body').focus();
       document.execCommand('insertHTML', false, html);
+    },
+
+    /* ── Image Manipulation Engine ── */
+
+    _selectedImg: null,
+
+    _initImageManager() {
+      const toolbar = document.getElementById('image-toolbar');
+      if (!toolbar) return;
+
+      document.querySelectorAll('.img-tool-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this._handleImageAction(btn.dataset.action);
+        });
+      });
+    },
+
+    _handleImageClick(img) {
+      this._selectedImg = img;
+      
+      // Highlight image
+      document.querySelectorAll('.editor-body img').forEach(i => i.classList.remove('selected'));
+      img.classList.add('selected');
+
+      // Position toolbar
+      const toolbar = document.getElementById('image-toolbar');
+      const rect = img.getBoundingClientRect();
+      
+      toolbar.style.display = 'flex';
+      toolbar.style.left = `${rect.left + rect.width / 2}px`;
+      toolbar.style.top = `${rect.top + window.scrollY}px`;
+    },
+
+    _hideImageToolbar() {
+      this._selectedImg = null;
+      document.querySelectorAll('.editor-body img').forEach(i => i.classList.remove('selected'));
+      const toolbar = document.getElementById('image-toolbar');
+      if (toolbar) toolbar.style.display = 'none';
+    },
+
+    _handleImageAction(action) {
+      if (!this._selectedImg) return;
+      const img = this._selectedImg;
+
+      switch(action) {
+        case 'size-sm': img.style.width = '25%'; break;
+        case 'size-md': img.style.width = '50%'; break;
+        case 'size-lg': img.style.width = '100%'; break;
+        case 'align-left': 
+          img.className = 'selected align-left';
+          break;
+        case 'align-center': 
+          img.className = 'selected align-center';
+          break;
+        case 'align-right': 
+          img.className = 'selected align-right';
+          break;
+        case 'delete':
+          img.remove();
+          this._hideImageToolbar();
+          break;
+      }
+      
+      this._scheduleAutoSave();
+      // Reposition toolbar after size change
+      setTimeout(() => this._handleImageClick(img), 100);
     }
   };
 })();

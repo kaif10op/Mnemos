@@ -4,6 +4,40 @@ const auth = require('../middleware/auth');
 const Note = require('../models/Note');
 const Folder = require('../models/Folder');
 const cache = require('../utils/cache');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure Multer Storage
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/');
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'img-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB per image
+});
+
+// @route   POST api/sync/upload
+// @desc    Upload an image for a note
+// @access  Private
+router.post('/upload', auth, upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ msg: 'No file uploaded' });
+  }
+  
+  // Return the public URL
+  // We assume the server is running on the same domain or we have a base URL.
+  // Using a relative path for flexibility.
+  const imageUrl = `/uploads/${req.file.filename}`;
+  res.json({ url: imageUrl });
+});
 
 // @route   GET api/sync
 // @desc    Fetch user's notes and folders from cloud (with pagination)

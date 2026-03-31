@@ -682,3 +682,66 @@
   flex: 1;
   font-size: 1rem;
 }
+
+/* ── Pro Components: Image Manipulation ── */
+.image-toolbar {
+  position: absolute;
+  background: rgba(24, 24, 27, 0.98);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  display: flex;
+  gap: 2px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 150;
+  pointer-events: auto;
+  transform: translate(-50%, -100%) translateY(-12px);
+  animation: bubblePop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.img-tool-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.img-tool-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent-primary);
+}
+
+.img-tool-btn.trash:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Image Selection Outline */
+.editor-body img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  display: block;
+  margin: 1em 0;
+}
+
+.editor-body img.selected {
+  outline: 3px solid var(--accent-primary);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 8px var(--accent-primary-glow);
+}
+
+.editor-body img.align-left { margin-right: auto; margin-left: 0; }
+.editor-body img.align-center { margin-left: auto; margin-right: auto; }
+.editor-body img.align-right { margin-left: auto; margin-right: 0; }
