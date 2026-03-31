@@ -370,6 +370,10 @@ async function fetchFromCloud() {
         activeNotes.push(incoming);
       } else if (new Date(incoming.updatedAt) > new Date(activeNotes[idx].updatedAt)) {
         activeNotes[idx] = { ...activeNotes[idx], ...incoming };
+        // ✅ PRO SYNC: If this note is currently open, notify the editor
+        if (window.Editor && typeof window.Editor.handleRemoteUpdate === 'function') {
+          window.Editor.handleRemoteUpdate(incoming.id);
+        }
       }
     });
 
@@ -588,12 +592,12 @@ window.SyncManager = {
 
   startHeartbeat() {
     if (this._heartbeat) clearInterval(this._heartbeat);
-    // Polling interval: 60 seconds for background parity
+    // Polling interval: 30 seconds for Pro-level background parity
     this._heartbeat = setInterval(() => {
       if (document.visibilityState === 'visible' && window.Auth.getToken()) {
         window.Store.fetchFromCloud();
       }
-    }, 60000);
+    }, 30000);
   },
 
   scheduleBackgroundSync(delay = 2000) {

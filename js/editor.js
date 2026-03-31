@@ -93,6 +93,43 @@
       return currentNoteId;
     },
 
+    // ✅ PRO SYNC: Called by Store when a remote update for this note arrives
+    handleRemoteUpdate(id) {
+      if (id === currentNoteId && isSaved) {
+        const note = window.Store.getNote(id);
+        if (note) {
+          // Update title and body quietly if no unsaved changes
+          const titleEl = document.getElementById('editor-title');
+          const bodyEl = document.getElementById('editor-body');
+          
+          if (titleEl && titleEl.value !== note.title) titleEl.value = note.title;
+          
+          // Only update body if content changed to avoid cursor jump
+          let content = note.content || '';
+          const baseUrl = window.API_BASE_URL.replace('/api', '');
+          if (content.includes('src="/uploads/')) {
+            content = content.replaceAll('src="/uploads/', `src="${baseUrl}/uploads/`);
+          }
+          
+          const sanitized = DOMPurify.sanitize(content);
+          if (bodyEl && bodyEl.innerHTML !== sanitized) {
+            bodyEl.innerHTML = sanitized;
+            this._updateStats();
+          }
+          
+          this._renderTags(note.tags);
+          this._updatePinButton(note.pinned);
+          
+          // Theme/Layout
+          const panel = document.querySelector('.editor-panel');
+          if (panel) {
+            panel.setAttribute('data-note-theme', note.theme || 'default');
+            panel.classList.toggle('full-width', !!note.isFullWidth);
+          }
+        }
+      }
+    },
+
     _bindToolbar() {
       document.querySelectorAll('[data-command]').forEach(btn => {
         btn.addEventListener('click', (e) => {
