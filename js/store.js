@@ -39,7 +39,10 @@ function getAllNotes() {
 
 function saveAllNotes(notes) {
   localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
-  if (window.Store && window.Store.scheduleSync) window.Store.scheduleSync();
+  // ✅ NEW: Use SyncManager for smart background sync (no re-renders)
+  if (window.SyncManager && window.Auth.getToken()) {
+    window.SyncManager.scheduleBackgroundSync();
+  }
 }
 
 function createNote(folderId = null) {
@@ -135,7 +138,10 @@ function getAllFolders() {
 
 function saveAllFolders(folders) {
   localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(folders));
-  if (window.Store && window.Store.scheduleSync) window.Store.scheduleSync();
+  // ✅ NEW: Use SyncManager for smart background sync (no re-renders)
+  if (window.SyncManager && window.Auth.getToken()) {
+    window.SyncManager.scheduleBackgroundSync();
+  }
 }
 
 function createFolder(name, icon = 'folder') {

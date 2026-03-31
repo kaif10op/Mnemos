@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="View shared note" />
+  <title>Shared Note — Mnemos</title>
+
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/animations.css" />
+  <link rel="stylesheet" href="css/editor.css" />
+
+  <style>
+    .shared-viewer {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      min-height: 100vh;
+      background: var(--bg-primary);
+    }
+
+    .shared-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-default);
+    }
+
+    .shared-header h1 {
+      margin: 0;
+      font-size: 28px;
+      color: var(--text-primary);
+    }
+
+    .shared-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .shared-meta span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .shared-content {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-md);
+      padding: 32px;
+      line-height: 1.8;
+      color: var(--text-primary);
+    }
+
+    .shared-content h2,
+    .shared-content h3 {
+      margin-top: 24px;
+      margin-bottom: 12px;
+    }
+
+    .shared-content h2:first-child {
+      margin-top: 0;
+    }
+
+    .shared-content p {
+      margin: 12px 0;
+    }
+
+    .shared-content ul,
+    .shared-content ol {
+      margin: 12px 0;
+      padding-left: 24px;
+    }
+
+    .shared-content code {
+      background: var(--bg-tertiary);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+    }
+
+    .shared-tags {
+      display: flex;
+      gap: 8px;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-default);
+      flex-wrap: wrap;
+    }
+
+    .shared-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--bg-tertiary);
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--text-primary);
+    }
+
+    .shared-tag .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: var(--text-secondary);
+    }
+
+    .error {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    .error i {
+      font-size: 48px;
+      margin-bottom: 16px;
+      color: var(--accent-danger);
+    }
+
+    .home-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent-primary);
+      text-decoration: none;
+      font-size: 14px;
+      margin-top: 16px;
+    }
+
+    .home-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="shared-viewer">
+    <div id="loading" class="loading">
+      <i class="ph-spin ph-spinner" style="font-size:32px; animation: spin 1s linear infinite;"></i>
+      <p style="margin-top: 16px;">Loading shared note...</p>
+    </div>
+
+    <div id="error" class="error" style="display: none;">
+      <i class="ph-duotone ph-warning-circle"></i>
+      <h2 id="error-title">Note not found</h2>
+      <p id="error-message">This note may have been deleted or the link has expired.</p>
+      <a href="/" class="home-link">
+        <i class="ph-bold ph-arrow-left"></i> Back to Notes
+      </a>
+    </div>
+
+    <div id="content" style="display: none;">
+      <div class="shared-header">
+        <h1 id="note-title">Untitled</h1>
+        <div class="shared-meta">
+          <span id="meta-views" title="Number of times viewed">
+            <i class="ph-duotone ph-eye"></i> <span id="views-count">0</span> views
+          </span>
+          <span id="meta-shared" title="When this was shared">
+            <i class="ph-duotone ph-link"></i> <span id="shared-date">-</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="shared-content" id="note-content"></div>
+      <div class="shared-tags" id="note-tags"></div>
+    </div>
+  </div>
+
+  <script>
+    // Get share token from URL
+    const token = window.location.pathname.split('/').pop();
+    const API_BASE_URL = localStorage.getItem('notesaver_api_base_url') || 'http://localhost:5050/api';
+
+    async function loadSharedNote() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/share/${token}`);
+
+        if (!res.ok) {
+          throw new Error('Note not found or expired');
+        }
+
+        const note = await res.json();
+
+        // Sanitize and display content
+        const titleEl = document.getElementById('note-title');
+        const contentEl = document.getElementById('note-content');
+        const tagsEl = document.getElementById('note-tags');
+        const viewsEl = document.getElementById('views-count');
+        const dateEl = document.getElementById('shared-date');
+
+        titleEl.textContent = note.title || 'Untitled Note';
+        contentEl.innerHTML = DOMPurify.sanitize(note.content || '');
+        viewsEl.textContent = note.views || 0;
+
+        // Format date
+        const sharedDate = new Date(note.sharedAt);
+        dateEl.textContent = sharedDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: sharedDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+        });
+
+        // Display tags
+        if (note.tags && note.tags.length > 0) {
+          tagsEl.innerHTML = note.tags.map(tag => {
+            // Simple hash-based color
+            let hash = 0;
+            for (let i = 0; i < tag.length; i++) {
+              hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const colors = [
+              '#7c5cfc', '#5ce0d6', '#ff6b9d', '#ffb84d', '#4ade80',
+              '#f472b6', '#818cf8', '#fb923c', '#a78bfa', '#34d399'
+            ];
+            const color = colors[Math.abs(hash) % colors.length];
+
+            return `
+              <span class="shared-tag">
+                <span class="dot" style="background: ${color};"></span>
+                ${tag}
+              </span>
+            `;
+          }).join('');
+        }
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+      } catch (err) {
+        console.error('Error loading note:', err);
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'flex';
+        document.getElementById('error-message').textContent = err.message;
+      }
+    }
+
+    // Load on page load
+    window.addEventListener('load', loadSharedNote);
+  </script>
+</body>
+</html>

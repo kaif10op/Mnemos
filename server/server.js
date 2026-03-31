@@ -56,6 +56,7 @@ connectDB();
 // Define Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/sync', require('./routes/sync'));
+app.use('/api/share', require('./routes/share')); // ✅ NEW: Sharing endpoints
 
 // ✅ LOGGING: Error handling middleware
 app.use((err, req, res, next) => {

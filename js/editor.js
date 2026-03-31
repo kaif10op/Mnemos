@@ -202,20 +202,16 @@
         });
       }
 
-      // Share button
+      // ✅ NEW: Share button - Create shareable link
       const shareBtn = document.getElementById('share-btn');
       if (shareBtn) {
         shareBtn.addEventListener('click', () => {
           if (!currentNoteId) return;
           const note = window.Store.getNote(currentNoteId);
-          const content = document.getElementById('editor-body').innerText || '';
-          if (navigator.share) {
-            navigator.share({
-              title: note.title || 'Untitled Note',
-              text: content,
-            }).catch(() => {});
+          if (window.Auth.getToken()) {
+            this._showShareModal(currentNoteId, note.title);
           } else {
-            window.showToast('Share not supported on this browser', 'warning');
+            window.showToast('Please log in to share notes', 'warning');
           }
         });
       }
@@ -394,6 +390,77 @@
           break;
         }
       }
+    },
+
+    // ✅ NEW: Show share modal with link to share note
+    async _showShareModal(noteId, noteTitle) {
+      const html = `
+        <div style="text-align: center; margin-bottom: var(--space-lg);">
+          <i class="ph-duotone ph-link" style="font-size: 48px; color: var(--accent-primary);"></i>
+        </div>
+        <h3 style="text-align: center; margin-bottom: var(--space-sm);">Share Note</h3>
+        <p style="text-align: center; color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-lg);">
+          Click the button below to create a shareable link. Anyone with the link can view this note.
+        </p>
+
+        <button class="btn btn-primary" id="modal-create-share" style="width: 100%; justify-content: center;">
+          <i class="ph-bold ph-link"></i> Create Share Link
+        </button>
+
+        <div id="share-result" style="display: none; margin-top: var(--space-lg); padding: var(--space-md); background: var(--bg-tertiary); border-radius: var(--radius-sm);">
+          <p style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-bottom: var(--space-xs);">Share Link:</p>
+          <div style="display: flex; gap: var(--space-sm);">
+            <input type="text" id="share-link-input" readonly style="flex: 1; padding: var(--space-sm); border-radius: var(--radius-sm); border: 1px solid var(--border-default); background: var(--bg-primary); color: var(--text-primary);" />
+            <button class="btn btn-secondary" id="modal-copy-link" style="padding: var(--space-sm) var(--space-md);">
+              <i class="ph-bold ph-copy"></i>
+            </button>
+          </div>
+          <p style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: var(--space-sm);">
+            <i class="ph-duotone ph-info"></i> This is a read-only view. Recipients can't edit or delete the note.
+          </p>
+        </div>
+      `;
+
+      window.showModal(html);
+
+      // Create share link
+      const createBtn = document.getElementById('modal-create-share');
+      createBtn.addEventListener('click', async () => {
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<i class="ph-bold ph-spinner" style="animation: spin 1s linear infinite;"></i> Creating...';
+
+        try {
+          const token = window.Auth.getToken();
+          const res = await fetch(`${window.API_BASE_URL}/share/${noteId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({})
+          });
+
+          if (!res.ok) throw new Error('Failed to create share link');
+
+          const data = await res.json();
+
+          // Show link
+          document.getElementById('share-result').style.display = 'block';
+          document.getElementById('modal-create-share').style.display = 'none';
+          document.getElementById('share-link-input').value = data.url;
+
+          // Copy to clipboard button
+          document.getElementById('modal-copy-link').addEventListener('click', () => {
+            document.getElementById('share-link-input').select();
+            document.execCommand('copy');
+            window.showToast('Link copied to clipboard!', 'success');
+          });
+        } catch (err) {
+          window.showToast('Error creating share link: ' + err.message, 'danger');
+          createBtn.disabled = false;
+          createBtn.innerHTML = '<i class="ph-bold ph-link"></i> Create Share Link';
+        }
+      });
     },
   };
 })();
