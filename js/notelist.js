@@ -46,7 +46,10 @@
 
       if (notes.length === 0) {
         container.style.display = 'none';
-        if (emptyState) emptyState.style.display = 'flex';
+        if (emptyState) {
+          emptyState.style.display = 'flex';
+          emptyState.innerHTML = this._getEmptyStateHtml(search, tag, filter);
+        }
         return;
       }
 
@@ -62,16 +65,20 @@
           `<span class="note-card-tag" style="background: ${window.Store.getTagColor(t)}" title="${t}"></span>`
         ).join('');
 
+        // Apply highlighting if searching
+        const highlightedTitle = this._highlightText(this._escapeHtml(title), search);
+        const highlightedPreview = this._highlightText(this._escapeHtml(preview), search);
+
         return `
           <div class="note-card ${note.id === currentId ? 'active' : ''}"
                data-note-id="${note.id}"
                data-render-key="${note.id}"
                style="animation-delay: ${idx * 30}ms">
             <div class="note-card-header">
-              <span class="note-card-title">${this._escapeHtml(title)}</span>
+              <span class="note-card-title">${highlightedTitle}</span>
               ${note.pinned ? '<span class="note-card-pin"><i class="ph-fill ph-push-pin" style="font-size:14px;fill:var(--accent-primary);"></i></span>' : ''}
             </div>
-            <p class="note-card-preview">${this._escapeHtml(preview)}</p>
+            <p class="note-card-preview">${highlightedPreview}</p>
             <div class="note-card-footer">
               <span class="note-card-date">${date}</span>
               <div class="note-card-tags">${tagDots}</div>
@@ -201,9 +208,72 @@
     },
 
     _escapeHtml(str) {
+      if (!str) return '';
       const div = document.createElement('div');
       div.textContent = str;
       return div.innerHTML;
     },
+
+    /**
+     * Highlights search terms in the provided text.
+     */
+    _highlightText(text, query) {
+      if (!query || !query.trim()) return text;
+      const q = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${q})`, 'gi');
+      return text.replace(regex, '<mark class="search-highlight">$1</mark>');
+    },
+
+    /**
+     * Generates contextual empty state HTML.
+     */
+    _getEmptyStateHtml(search, tag, filter) {
+      if (search) {
+        return `
+          <div class="empty-state-content">
+            <i class="ph-duotone ph-magnifying-glass" style="font-size:48px; opacity:0.2; margin-bottom:16px;"></i>
+            <h3>No matches found</h3>
+            <p>No notes matching "${this._escapeHtml(search)}"</p>
+          </div>
+        `;
+      }
+      if (tag) {
+        return `
+          <div class="empty-state-content">
+            <i class="ph-duotone ph-tag" style="font-size:48px; opacity:0.2; margin-bottom:16px;"></i>
+            <h3>No notes tagged with #${tag}</h3>
+            <p>Try selecting a different tag or creating a new note.</p>
+          </div>
+        `;
+      }
+      if (filter.type === 'folder') {
+        return `
+          <div class="empty-state-content">
+            <i class="ph-duotone ph-folder-open" style="font-size:48px; opacity:0.2; margin-bottom:16px;"></i>
+            <h3>This folder is empty</h3>
+            <p>Ready to capture your next big idea?</p>
+            <button class="btn btn-primary" onclick="window.NoteList.createNewNoteInFolder('${filter.id}')" style="margin-top:20px;">
+              <i class="ph ph-plus"></i> Add Note
+            </button>
+          </div>
+        `;
+      }
+      return `
+        <div class="empty-state-content">
+          <i class="ph-duotone ph-notebook" style="font-size:48px; opacity:0.2; margin-bottom:16px;"></i>
+          <h3>No notes yet</h3>
+          <p>Create your first note to get started</p>
+          <button class="btn btn-primary" onclick="window.NoteList.createNewNoteInFolder()" style="margin-top:20px;">
+            <i class="ph ph-plus"></i> Create Note
+          </button>
+        </div>
+      `;
+    },
+
+    createNewNoteInFolder(folderId = null) {
+      const note = window.Store.createNote(folderId);
+      this.render(true);
+      window.Editor.open(note.id);
+    }
   };
 })();

@@ -147,6 +147,14 @@
   flex: 1;
 }
 
+.search-highlight {
+  background-color: var(--accent-primary-glow);
+  color: var(--accent-primary);
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 700;
+}
+
 .note-card-pin {
   color: var(--accent-warning);
   font-size: 12px;
@@ -197,6 +205,13 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  height: 100%;
+}
+
+.empty-state-content {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: var(--space-3xl);
@@ -204,20 +219,15 @@
   animation: fadeInUp var(--transition-slow) both;
 }
 
-.notelist-empty-icon {
-  font-size: 48px;
-  margin-bottom: var(--space-lg);
-  opacity: 0.4;
-}
-
-.notelist-empty h3 {
+.empty-state-content h3 {
   font-size: var(--font-size-md);
-  color: var(--text-secondary);
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-xs);
+  color: var(--text-primary);
 }
 
-.notelist-empty p {
+.empty-state-content p {
   font-size: var(--font-size-sm);
   color: var(--text-tertiary);
-  max-width: 200px;
+  max-width: 240px;
+  line-height: 1.5;
 }
