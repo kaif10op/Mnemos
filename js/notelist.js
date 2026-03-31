@@ -102,6 +102,20 @@
             window.Editor.open(id);
           }
         });
+
+        // ✅ PRO: Predictive Prefetching (Hover)
+        container.addEventListener('mouseover', (e) => {
+          const card = e.target.closest('.note-card');
+          if (card && !card._prefetched) {
+            const id = card.dataset.noteId;
+            const note = window.Store.getNote(id);
+            if (note && note.content.includes('<img')) {
+              this._prefetchAssets(note.content);
+              card._prefetched = true;
+            }
+          }
+        });
+        
         this._clickHandlerBound = true;
       }
 
@@ -274,6 +288,23 @@
       const note = window.Store.createNote(folderId);
       this.render(true);
       window.Editor.open(note.id);
+    },
+
+    /**
+     * Predictive Asset Prefetching
+     * Scans content for GridFS images and triggers background fetch
+     */
+    _prefetchAssets(content) {
+      const imgRegex = /<img[^>]+src="([^">]+)"/g;
+      let match;
+      while ((match = imgRegex.exec(content)) !== null) {
+        const url = match[1];
+        if (url.includes('/api/sync/image/')) {
+          const img = new Image();
+          img.src = url; 
+          console.log('☁️ Prefetching asset:', url.split('/').pop());
+        }
+      }
     }
   };
 })();

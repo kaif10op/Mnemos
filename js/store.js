@@ -294,14 +294,48 @@ async function fetchFromCloud() {
     const beforeFolders = getAllFolders();
     const beforeFingerprint = _buildDataFingerprint(beforeNotes, beforeFolders);
 
-    // ✅ Use retry logic for resilience
+    // 🚀 CACHE GUARD: Check version hash first (Silent offline handling)
+    let hash = null;
+    try {
+      const statusRes = await fetch(`${window.API_BASE_URL}/sync/status`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (statusRes.ok) {
+        const data = await statusRes.json();
+        hash = data.hash;
+        const lastHash = localStorage.getItem('last_sync_hash');
+        if (hash === lastHash) {
+          console.log('☁️ Sync: Cache HIT (No server changes)');
+          return; 
+        }
+      }
+    } catch (e) {
+      console.log('☁️ Sync: Offline or server unreachable (skipping status check)');
+      return; // Silent bypass — keep using local data
+    }
+
+    if (hash) localStorage.setItem('last_sync_hash', hash);
+
+    // ✅ Use retry logic for resilience with ETag support
     const res = await window.ErrorHandler.retryWithBackoff(
       () => window.ErrorHandler.fetchWithRetry(`${window.API_BASE_URL}/sync`, {
         method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'If-None-Match': localStorage.getItem('last_sync_etag') || ''
+        }
       }),
-      2 // Retry 2 times (3 total attempts)
+      2
     );
+
+    if (res.status === 304) {
+      console.log('☁️ Sync: 304 Not Modified (Payload skip)');
+      return;
+    }
+
+    // Store new ETag
+    const newEtag = res.headers.get('ETag');
+    if (newEtag) localStorage.setItem('last_sync_etag', newEtag);
 
     const data = await res.json();
     let notes = data.notes || [];

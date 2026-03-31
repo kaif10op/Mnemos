@@ -111,23 +111,17 @@
     window.SearchManager.init();
     window.Palette.init();
     window.Auth.init();
+    window.Sidebar.init();
+    window.NoteList.init();
+    window.Editor.init();
+    window.ShortcutManager.init();
 
-    // Check auth status and load notes accordingly
+    // ✅ PRO: Local-First Rendering
+    // Now trigger the silent background sync if logged in
     const token = window.Auth.getToken();
     if (token) {
-      // User is logged in - fetch from cloud
-      window.Store.initSync(); // This will fetch from cloud
-      window.Sidebar.init();
-      window.NoteList.init();
-      window.Editor.init();
-    } else {
-      // User is NOT logged in - initialize empty
-      window.Sidebar.init();
-      window.NoteList.init();
-      window.Editor.init();
+      window.Store.initSync(); 
     }
-
-    window.ShortcutManager.init();
 
     // ✅ URL HASH ROUTING: Open note from URL if present
     const handleHashNavigation = () => {

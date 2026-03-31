@@ -74,10 +74,24 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/share', require('./routes/share')); // ✅ Sharing endpoints
 
-// ✅ Serve static assets (images, etc)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-// ✅ Serve frontend static files
-app.use(express.static(path.join(__dirname, '..')));
+// ✅ PRO CACHING: Aggressive Browser-Level Caching for Static Assets
+const staticOptions = {
+  maxAge: '1y',
+  immutable: true,
+  lastModified: true,
+  etag: true,
+  setHeaders: (res, path) => {
+    if (path.endsWith('.html')) {
+      // Don't cache HTML files — always check for updates
+      res.setHeader('Cache-Control', 'no-cache');
+    } else if (path.includes('/assets/') || path.endsWith('.css') || path.endsWith('.js') || path.endsWith('.woff2')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }
+};
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), staticOptions));
+app.use(express.static(path.join(__dirname, '..'), staticOptions));
 
 // ✅ Redirect old /shared/:token path-based URLs to query-param format
 app.get('/shared/:token', (req, res) => {

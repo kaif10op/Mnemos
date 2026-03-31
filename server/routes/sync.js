@@ -11,7 +11,11 @@ const crypto = require('crypto');
 
 const { Readable } = require('stream');
 
-// Use Memory Storage for maximum control and performance
+// ✅ PERFORMANCE: In-Memory Sync Cache (Fingerprint Cache)
+const statusCache = new Map();
+
+// Helper to invalidate cache
+const clearStatusCache = (userId) => statusCache.delete(userId.toString());
 const storage = multer.memoryStorage();
 
 const upload = multer({ 
@@ -114,31 +118,73 @@ router.post('/upload', auth, upload.single('image'), (req, res) => {
   }
 });
 
+// @route   GET api/sync/status
+// @desc    Get a tiny version hash of the user's data (for caching)
+// @access  Private
+router.get('/status', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Check Cache First
+    if (statusCache.has(userId.toString())) {
+      return res.json({ hash: statusCache.get(userId.toString()), cached: true });
+    }
+    
+    // Performance: Only fetch projected timestamps
+    const notes = await Note.find({ userId }).select('updatedAt clientUpdatedAt').sort({ clientUpdatedAt: -1 });
+    const folders = await Folder.find({ userId }).select('updatedAt').sort({ updatedAt: -1 });
+
+    // Generate a SHA-1 fingerprint of the entire state
+    const fingerprint = crypto.createHash('sha1')
+      .update(JSON.stringify({ notes, folders }))
+      .digest('hex');
+
+    // Store in cache (1-min max life for safety)
+    statusCache.set(userId.toString(), fingerprint);
+    setTimeout(() => clearStatusCache(userId), 60000);
+
+    res.json({ hash: fingerprint, cached: false });
+  } catch (err) {
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
 // @route   GET api/sync
-// @desc    Fetch user's notes and folders from cloud (with pagination)
+// @desc    Fetch user's notes and folders from cloud (with ETag caching)
 // @access  Private
 router.get('/', auth, async (req, res) => {
   const userId = req.user.id;
   const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = Math.min(100, parseInt(req.query.limit) || 50); // Max 100 per page
+  const limit = Math.min(100, parseInt(req.query.limit) || 50);
   const skip = (page - 1) * limit;
 
   try {
-    // ✅ FEATURE: Pagination with lazy loading
+    // 🚀 CACHING: Generate ETag from data state
+    const notesCount = await Note.countDocuments({ userId, deletedAt: null });
+    const latestNote = await Note.findOne({ userId }).sort({ updatedAt: -1 }).select('updatedAt');
+    const etag = crypto.createHash('md5')
+      .update(`${userId}-${notesCount}-${latestNote?.updatedAt || '0'}`)
+      .digest('hex');
+
+    // Browser cache check
+    if (req.header('If-None-Match') === etag) {
+      return res.status(304).end();
+    }
+
+    res.set('ETag', etag);
+    res.set('Cache-Control', 'private, max-age=0, must-revalidate');
+
     const allNotes = await Note.find({ userId })
       .active()
-      .sort({ pinned: -1, updatedAt: -1 }) // Pinned first, then by date
+      .sort({ pinned: -1, updatedAt: -1 })
       .skip(skip)
       .limit(limit);
 
     const totalNotes = await Note.countDocuments({ userId, deletedAt: null });
     const allFolders = await Folder.find({ userId });
-
-    // Extract soft-deleted IDs for offline sync resolution
     const trashedNotes = await Note.find({ userId, deletedAt: { $ne: null } }).select('clientId');
     const deletedNoteIds = trashedNotes.map(n => n.clientId);
 
-    // Map back to client format
     const cloudNotes = allNotes.map(n => ({
       id: n.clientId,
       title: n.title,
@@ -181,6 +227,9 @@ router.get('/', auth, async (req, res) => {
 router.post('/', auth, async (req, res) => {
   const { notes, folders, deletedNoteIds = [], deletedFolderIds = [] } = req.body;
   const userId = req.user.id;
+
+  // 🚀 INVALIDATE CACHE on push
+  clearStatusCache(userId);
 
   try {
     // --- FOLDERS ---
