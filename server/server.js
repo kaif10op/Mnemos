@@ -21,12 +21,11 @@ const connectDB = async () => {
       const mongoServer = await MongoMemoryServer.create();
       mongoUri = mongoServer.getUri();
       console.log(`✅ Started in-memory DB at: ${mongoUri}`);
+    } else {
+      console.log('✅ Using MongoDB URI from .env');
     }
 
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect(mongoUri);
     console.log('✅ MongoDB Connected...');
   } catch (err) {
     console.error(err.message);
@@ -39,6 +38,6 @@ connectDB();
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/sync', require('./routes/sync'));
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 
 app.listen(PORT, () => console.log(`🚀 Server started on port ${PORT}`));

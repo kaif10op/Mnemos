@@ -90,11 +90,11 @@
 
   // ── Bootstrap ──
   document.addEventListener('DOMContentLoaded', () => {
-    
+
     // Sidebar Toggle Logic
     const toggleBtn = document.getElementById('sidebar-toggle-btn');
     const appEl = document.getElementById('app');
-    
+
     if (localStorage.getItem('sidebar_collapsed') === 'true') {
       appEl.classList.add('sidebar-collapsed');
     }
@@ -106,24 +106,28 @@
       });
     }
 
-    // Existing initializes
+    // Init core services
     window.ThemeManager.init();
     window.SearchManager.init();
     window.Palette.init();
-    window.Store.initSync(); // Setup background sync loop
     window.Auth.init();
-    window.Sidebar.init();
-    window.NoteList.init();
-    window.Editor.init();
-    window.ShortcutManager.init();
 
-    // Seed demo notes if first visit
-    if (window.Store.getAllNotes().length === 0) {
-      seedDemoNotes();
-      window.Sidebar.renderFolders();
-      window.Sidebar.renderTags();
-      window.NoteList.render();
+    // Check auth status and load notes accordingly
+    const token = window.Auth.getToken();
+    if (token) {
+      // User is logged in - fetch from cloud
+      window.Store.initSync(); // This will fetch from cloud
+      window.Sidebar.init();
+      window.NoteList.init();
+      window.Editor.init();
+    } else {
+      // User is NOT logged in - initialize empty
+      window.Sidebar.init();
+      window.NoteList.init();
+      window.Editor.init();
     }
+
+    window.ShortcutManager.init();
   });
 
   // ── Seed Demo Notes ──

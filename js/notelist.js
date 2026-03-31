@@ -81,6 +81,13 @@
     },
 
     createNew() {
+      // Require authentication to create notes
+      if (!window.Auth.getToken()) {
+        window.showToast('Please log in to create notes', 'warning');
+        window.Auth._showAuthModal('login');
+        return;
+      }
+
       const filter = window.Sidebar.getFilter();
       const folderId = filter.type === 'folder' ? filter.id : null;
       const note = window.Store.createNote(folderId);

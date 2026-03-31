@@ -2,7 +2,8 @@
    AUTH — Handles Login, Registration, and Tokens
    ============================================ */
 
-window.API_BASE_URL = window.API_BASE_URL || 'http://localhost:5000/api';
+const configuredApiBaseUrl = localStorage.getItem('notesaver_api_base_url');
+window.API_BASE_URL = window.API_BASE_URL || configuredApiBaseUrl || 'http://localhost:5050/api';
 
 (function () {
   window.Auth = {
@@ -42,9 +43,12 @@ window.API_BASE_URL = window.API_BASE_URL || 'http://localhost:5000/api';
     logout() {
       localStorage.removeItem('notesaver_token');
       localStorage.removeItem('notesaver_user');
+      // Clear all notes/folders when logging out
+      localStorage.removeItem('notesaver_notes');
+      localStorage.removeItem('notesaver_folders');
       this.updateAuthUI();
       window.showToast('Logged out successfully', 'info');
-      // Render local store only
+      // Render empty state
       window.Sidebar.renderFolders();
       window.Sidebar.renderTags();
       window.NoteList.render();

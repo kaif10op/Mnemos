@@ -127,11 +127,7 @@ function getAllTags() {
 function getAllFolders() {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.FOLDERS);
-    return data ? JSON.parse(data) : [
-      { id: '__default__', name: 'Personal', icon: 'folder' },
-      { id: '__work__', name: 'Work', icon: 'briefcase' },
-      { id: '__ideas__', name: 'Ideas', icon: 'lightbulb' },
-    ];
+    return data ? JSON.parse(data) : [];
   } catch {
     return [];
   }
@@ -239,9 +235,85 @@ function importData(file) {
 let syncTimer = null;
 
 function initSync() {
-  // Sync on startup if logged in
+  // Only sync if logged in
   if (Auth.getToken()) {
-    syncWithCloud();
+    // First, FETCH notes from cloud on startup
+    fetchFromCloud();
+  }
+}
+
+async function fetchFromCloud() {
+  const token = Auth.getToken();
+  if (!token) return;
+
+  try {
+    const res = await fetch(`${window.API_BASE_URL}/sync`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!res.ok) throw new Error('Fetch failed');
+
+    const data = await res.json();
+    let notes = data.notes || [];
+    let folders = data.folders || [];
+
+    // If new user (no notes or folders from cloud), seed defaults
+    if (notes.length === 0 && folders.length === 0) {
+      // Create default folders
+      const defaultFolders = [
+        { id: generateId(), name: 'Personal', icon: 'folder' },
+        { id: generateId(), name: 'Work', icon: 'briefcase' },
+        { id: generateId(), name: 'Ideas', icon: 'lightbulb' },
+      ];
+
+      folders = defaultFolders;
+
+      // Create welcome note
+      const welcomeNote = {
+        id: generateId(),
+        title: 'Welcome to Notes Saver ✨',
+        content: `<h2>Your Personal Note-Taking Space</h2>
+<p>Welcome! This is a powerful, beautiful note-taking application that syncs across devices.</p>
+<h3>Features you'll love:</h3>
+<ul>
+  <li><strong>Rich text editing</strong> — Bold, italic, headings, lists, and more</li>
+  <li><strong>Folders</strong> — Organize your notes by category</li>
+  <li><strong>Tags</strong> — Add tags for quick filtering</li>
+  <li><strong>Search</strong> — Find any note instantly</li>
+  <li><strong>Dark &amp; Light themes</strong> — Toggle in the sidebar</li>
+  <li><strong>Keyboard shortcuts</strong> — Press <code>Ctrl+/</code> to see all shortcuts</li>
+  <li><strong>Auto-save</strong> — Your notes are saved automatically</li>
+  <li><strong>Cloud Sync</strong> — Your notes are synced with the cloud!</li>
+</ul>`,
+        folderId: defaultFolders[0].id,
+        tags: ['welcome', 'guide'],
+        pinned: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      notes = [welcomeNote];
+
+      // Save to local storage first
+      saveAllNotes(notes);
+      saveAllFolders(folders);
+
+      // Then push new data to cloud
+      await syncWithCloud();
+      return; // UI will be refreshed by syncWithCloud
+    }
+
+    // Load cloud data into local storage (source of truth)
+    saveAllNotes(notes);
+    saveAllFolders(folders);
+
+    // Refresh UI
+    window.Sidebar.renderFolders();
+    window.Sidebar.renderTags();
+    window.NoteList.render();
+  } catch (err) {
+    console.error('Fetch from Cloud Error:', err);
   }
 }
 
@@ -262,7 +334,7 @@ async function syncWithCloud() {
   const statusEl = document.getElementById('save-status-label');
 
   try {
-    const res = await fetch(`${window.API_BASE_URL || 'http://localhost:5000/api'}/sync`, {
+    const res = await fetch(`${window.API_BASE_URL}/sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -274,11 +346,11 @@ async function syncWithCloud() {
     if (!res.ok) throw new Error('Sync failed');
 
     const data = await res.json();
-    
-    // Merge back cloud data (overwrite local since cloud handles logic)
+
+    // Merge back cloud data (server is source of truth)
     saveAllNotes(data.notes || []);
     saveAllFolders(data.folders || []);
-    
+
     // Refresh UI
     window.Sidebar.renderFolders();
     window.Sidebar.renderTags();
