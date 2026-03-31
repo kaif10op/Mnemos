@@ -247,12 +247,14 @@ async function fetchFromCloud() {
   if (!token) return;
 
   try {
-    const res = await fetch(`${window.API_BASE_URL}/sync`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-
-    if (!res.ok) throw new Error('Fetch failed');
+    // ✅ Use retry logic for resilience
+    const res = await window.ErrorHandler.retryWithBackoff(
+      () => window.ErrorHandler.fetchWithRetry(`${window.API_BASE_URL}/sync`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      2 // Retry 2 times (3 total attempts)
+    );
 
     const data = await res.json();
     let notes = data.notes || [];
@@ -313,7 +315,7 @@ async function fetchFromCloud() {
     window.Sidebar.renderTags();
     window.NoteList.render();
   } catch (err) {
-    console.error('Fetch from Cloud Error:', err);
+    window.ErrorHandler.handleNetworkError(err, 'Cloud Fetch');
   }
 }
 
@@ -334,16 +336,18 @@ async function syncWithCloud() {
   const statusEl = document.getElementById('save-status-label');
 
   try {
-    const res = await fetch(`${window.API_BASE_URL}/sync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ notes, folders })
-    });
-
-    if (!res.ok) throw new Error('Sync failed');
+    // ✅ Use retry logic for resilience
+    const res = await window.ErrorHandler.retryWithBackoff(
+      () => window.ErrorHandler.fetchWithRetry(`${window.API_BASE_URL}/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ notes, folders })
+      }),
+      2 // Retry 2 times (3 total attempts)
+    );
 
     const data = await res.json();
 
@@ -358,8 +362,10 @@ async function syncWithCloud() {
 
     if (statusEl) statusEl.textContent = 'Saved & Synced';
   } catch (err) {
-    console.error('Sync Error:', err);
-    if (statusEl) statusEl.textContent = 'Sync Failed (Offline)';
+    const errorInfo = window.ErrorHandler.handleNetworkError(err, 'Cloud Sync');
+    if (statusEl) {
+      statusEl.textContent = errorInfo.offline ? 'Offline (Will sync later)' : 'Sync Failed';
+    }
   }
 }
 
