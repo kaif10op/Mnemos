@@ -156,10 +156,22 @@
         });
 
         body.addEventListener('keydown', (e) => {
-          // Tab to indent properly instead of outdent block
+          // Tab to indent properly in lists
           if (e.key === 'Tab') {
             e.preventDefault();
-            document.execCommand('insertText', false, '  ');
+            if (e.shiftKey) {
+              document.execCommand('outdent', false, null);
+            } else {
+              document.execCommand('indent', false, null);
+            }
+            this._scheduleAutoSave();
+          }
+        });
+
+        // Handle Markdown shortcuts on Space or Enter
+        body.addEventListener('keyup', (e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            this._handleMarkdownShortcuts(e);
           }
         });
 
@@ -332,6 +344,56 @@
           }
         } catch { /* ignore */ }
       });
+    },
+
+    _handleMarkdownShortcuts(e) {
+      const selection = window.getSelection();
+      if (!selection.rangeCount) return;
+      
+      const range = selection.getRangeAt(0);
+      const container = range.startContainer;
+      
+      // We only care about text nodes
+      if (container.nodeType !== Node.TEXT_NODE) return;
+      
+      const text = container.textContent;
+      const cursorPosition = range.startOffset;
+      
+      // Check the text before the cursor
+      const textBeforeCursor = text.substring(0, cursorPosition);
+      
+      const shortcuts = [
+        { pattern: /^#\s$/, command: 'formatBlock', value: 'h1' },
+        { pattern: /^##\s$/, command: 'formatBlock', value: 'h2' },
+        { pattern: /^###\s$/, command: 'formatBlock', value: 'h3' },
+        { pattern: /^-\s$/, command: 'insertUnorderedList', value: null },
+        { pattern: /^\*\s$/, command: 'insertUnorderedList', value: null },
+        { pattern: /^1\.\s$/, command: 'insertOrderedList', value: null },
+        { pattern: /^>\s$/, command: 'formatBlock', value: 'blockquote' },
+      ];
+
+      for (const { pattern, command, value } of shortcuts) {
+        if (pattern.test(textBeforeCursor)) {
+          // Prevent the space from being typed if we're transforming
+          // Actually, since this is on keyup, the space is already there.
+          // We need to remove the shortcut prefix.
+          
+          const match = textBeforeCursor.match(pattern);
+          const matchLength = match[0].length;
+          
+          // Remove the characters
+          range.setStart(container, cursorPosition - matchLength);
+          range.setEnd(container, cursorPosition);
+          range.deleteContents();
+          
+          // Execute command
+          document.execCommand(command, false, value);
+          
+          this._scheduleAutoSave();
+          this._updateToolbarState();
+          break;
+        }
+      }
     },
   };
 })();

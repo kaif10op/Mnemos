@@ -25,6 +25,7 @@
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/notelist.css" />
   <link rel="stylesheet" href="css/editor.css" />
+  <link rel="stylesheet" href="css/palette.css" />
 </head>
 <body>
 
@@ -97,6 +98,9 @@
           <div class="theme-toggle-knob"><i class="ph-duotone ph-moon" style="font-size:16px;"></i></div>
         </button>
         <div class="sidebar-footer-actions">
+          <button class="sidebar-footer-btn" id="auth-btn" title="Sign In / Sync" aria-label="Sign In">
+            <i class="ph-duotone ph-user-circle" style="font-size:20px;"></i>
+          </button>
           <button class="sidebar-footer-btn" id="import-btn" title="Import notes" aria-label="Import notes"><i class="ph-duotone ph-download-simple" style="font-size:20px;"></i></button>
           <button class="sidebar-footer-btn" id="export-btn" title="Export notes" aria-label="Export notes"><i class="ph-duotone ph-upload-simple" style="font-size:20px;"></i></button>
           <button class="sidebar-footer-btn" id="shortcuts-btn" title="Keyboard shortcuts" aria-label="Keyboard shortcuts" onclick="window.ShortcutManager._showShortcutsModal()">
@@ -229,15 +233,16 @@
 
         <!-- Content -->
         <div class="editor-body-wrapper">
-          <div
-            id="editor-body"
-            class="editor-body"
-            contenteditable="true"
-            spellcheck="true"
-            role="textbox"
-            aria-multiline="true"
-            aria-label="Note content editable area"
-          ></div>
+            <div
+              id="editor-body"
+              class="editor-body"
+              contenteditable="true"
+              spellcheck="true"
+              role="textbox"
+              aria-multiline="true"
+              aria-label="Note content editable area"
+              data-placeholder="Start writing your thoughts..."
+            ></div>
         </div>
 
         <!-- Footer -->
@@ -265,10 +270,25 @@
     <div class="modal" id="modal"></div>
   </div>
 
-  <!-- Scripts -->
+  <!-- ══════ COMMAND PALETTE ══════ -->
+  <div class="palette-overlay" id="palette-overlay" role="dialog" aria-modal="true">
+    <div class="palette-modal">
+      <div class="palette-header">
+        <i class="ph-bold ph-magnifying-glass palette-icon"></i>
+        <input type="text" id="palette-input" class="palette-input" placeholder="Search commands, notes, and tags..." aria-label="Command Palette Search">
+        <span class="palette-hint">esc</span>
+      </div>
+      <div class="palette-content" id="palette-results">
+        <!-- Results injected dynamically -->
+      </div>
+    </div>
+  </div>
+
   <script src="js/store.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/theme.js"></script>
   <script src="js/search.js"></script>
+  <script src="js/palette.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/sidebar.js"></script>
   <script src="js/notelist.js"></script>

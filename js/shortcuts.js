@@ -27,6 +27,12 @@
           document.getElementById('search-input')?.focus();
         }
 
+        // Ctrl+\ — Toggle Sidebar
+        if (ctrl && e.key === '\\') {
+          e.preventDefault();
+          document.getElementById('sidebar-toggle-btn')?.click();
+        }
+
         // Ctrl+E — Export
         if (ctrl && e.key === 'e') {
           e.preventDefault();
@@ -61,6 +67,7 @@
         ['Ctrl + N', 'New note'],
         ['Ctrl + S', 'Save note'],
         ['Ctrl + F', 'Search notes'],
+        ['Ctrl + \\', 'Toggle sidebar'],
         ['Ctrl + E', 'Export notes'],
         ['Ctrl + Shift + T', 'Toggle theme'],
         ['Ctrl + /', 'Show shortcuts'],
@@ -68,12 +75,15 @@
       ];
 
       const html = `
-        <h3>⌨️ Keyboard Shortcuts</h3>
-        <div style="margin-top: var(--space-lg);">
+        <div style="text-align: center; margin-bottom: var(--space-xl);">
+          <i class="ph-duotone ph-keyboard" style="font-size: 48px; color: var(--accent-primary);"></i>
+        </div>
+        <h3 style="text-align: center; margin-bottom: var(--space-lg);">Keyboard Shortcuts</h3>
+        <div style="margin-top: var(--space-md);">
           ${shortcuts.map(([key, desc]) => `
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-default);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-sm) 12px; border-bottom: 1px solid var(--border-default);">
               <span style="color: var(--text-secondary); font-size: var(--font-size-sm);">${desc}</span>
-              <kbd class="kbd">${key}</kbd>
+              <kbd class="kbd" style="background: var(--bg-tertiary); box-shadow: 0 2px 0 var(--border-default);">${key}</kbd>
             </div>
           `).join('')}
         </div>

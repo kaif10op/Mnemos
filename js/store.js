@@ -39,6 +39,7 @@ function getAllNotes() {
 
 function saveAllNotes(notes) {
   localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
+  if (window.Store && window.Store.scheduleSync) window.Store.scheduleSync();
 }
 
 function createNote(folderId = null) {
@@ -138,6 +139,7 @@ function getAllFolders() {
 
 function saveAllFolders(folders) {
   localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(folders));
+  if (window.Store && window.Store.scheduleSync) window.Store.scheduleSync();
 }
 
 function createFolder(name, icon = 'folder') {
@@ -232,6 +234,63 @@ function importData(file) {
   });
 }
 
+/* ── Async Sync ── */
+
+let syncTimer = null;
+
+function initSync() {
+  // Sync on startup if logged in
+  if (Auth.getToken()) {
+    syncWithCloud();
+  }
+}
+
+function scheduleSync() {
+  if (!Auth.getToken()) return;
+  clearTimeout(syncTimer);
+  const statusEl = document.getElementById('save-status-label');
+  if (statusEl) statusEl.textContent = 'Syncing...';
+  syncTimer = setTimeout(() => syncWithCloud(), 2000); // Debounce sync
+}
+
+async function syncWithCloud() {
+  const token = Auth.getToken();
+  if (!token) return;
+
+  const notes = getAllNotes();
+  const folders = getAllFolders();
+  const statusEl = document.getElementById('save-status-label');
+
+  try {
+    const res = await fetch(`${window.API_BASE_URL || 'http://localhost:5000/api'}/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ notes, folders })
+    });
+
+    if (!res.ok) throw new Error('Sync failed');
+
+    const data = await res.json();
+    
+    // Merge back cloud data (overwrite local since cloud handles logic)
+    saveAllNotes(data.notes || []);
+    saveAllFolders(data.folders || []);
+    
+    // Refresh UI
+    window.Sidebar.renderFolders();
+    window.Sidebar.renderTags();
+    window.NoteList.render();
+
+    if (statusEl) statusEl.textContent = 'Saved & Synced';
+  } catch (err) {
+    console.error('Sync Error:', err);
+    if (statusEl) statusEl.textContent = 'Sync Failed (Offline)';
+  }
+}
+
 /* ── Helpers ── */
 
 function stripHtml(html) {
@@ -261,6 +320,7 @@ window.Store = {
   togglePin, getFilteredNotes, getAllTags, getTagColor,
   getAllFolders, saveAllFolders, createFolder, updateFolder, deleteFolder, getNotesCountByFolder,
   getSettings, saveSetting,
+  initSync, syncWithCloud, scheduleSync,
   exportData, importData,
   stripHtml, formatDate, generateId,
 };

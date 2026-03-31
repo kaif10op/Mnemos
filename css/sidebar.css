@@ -10,19 +10,25 @@
   gap: var(--space-md);
   border-bottom: 1px solid var(--border-default);
   flex-shrink: 0;
+  background: var(--bg-secondary);
+  backdrop-filter: blur(var(--glass-blur));
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .sidebar-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  background: var(--accent-primary);
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 20px;
   color: white;
   flex-shrink: 0;
+  box-shadow: var(--shadow-glow);
 }
 
 .sidebar-brand {
@@ -71,7 +77,7 @@
   padding: var(--space-sm) var(--space-md);
   padding-left: 36px;
   padding-right: 36px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-default);
   color: var(--text-primary);
@@ -84,9 +90,9 @@
 }
 
 .search-input:focus {
-  border-color: var(--border-focus);
+  border-color: var(--accent-primary);
   background: var(--bg-elevated);
-  box-shadow: 0 0 0 3px var(--accent-primary-glow);
+  box-shadow: var(--shadow-glow);
 }
 
 .search-input:focus ~ .search-icon {
@@ -96,13 +102,13 @@
 .search-clear {
   position: absolute;
   right: var(--space-sm);
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 14px;
   color: var(--text-tertiary);
   opacity: 0;
   pointer-events: none;
@@ -169,36 +175,40 @@
   align-items: center;
   gap: var(--space-md);
   padding: var(--space-sm) var(--space-lg);
-  margin: 0 var(--space-sm);
+  margin: 2px var(--space-sm);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-base);
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
   position: relative;
+  border: 1px solid transparent;
 }
 
 .nav-item:hover {
-  background: var(--bg-glass-hover);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
 .nav-item.active {
-  background: var(--accent-primary-glow);
+  background: var(--bg-elevated);
   color: var(--accent-primary);
   font-weight: var(--font-weight-medium);
+  border-color: var(--border-active);
+  box-shadow: var(--shadow-sm);
 }
 
 .nav-item.active::before {
   content: '';
   position: absolute;
-  left: 0;
+  left: -8px;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 18px;
+  width: 4px;
+  height: 20px;
   border-radius: 0 var(--radius-full) var(--radius-full) 0;
   background: var(--accent-primary);
+  box-shadow: var(--shadow-glow);
 }
 
 .nav-item-icon {
@@ -323,13 +333,14 @@
   width: 18px;
   height: 18px;
   border-radius: var(--radius-full);
-  background: var(--accent-primary);
+  background: white;
   transition: transform var(--transition-spring);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  color: white;
+  color: var(--accent-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 [data-theme="light"] .theme-toggle-knob {

@@ -43,11 +43,14 @@
     if (!overlay || !modal) return;
 
     modal.innerHTML = `
-      <h3>${title}</h3>
-      <p style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-lg);">${message}</p>
-      <div class="modal-actions">
+      <div style="text-align: center; margin-bottom: var(--space-xl);">
+        <i class="ph-duotone ph-warning-circle" style="font-size: 48px; color: var(--accent-danger);"></i>
+      </div>
+      <h3 style="text-align: center; margin-bottom: var(--space-sm);">${title}</h3>
+      <p style="text-align: center; color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-2xl);">${message}</p>
+      <div class="modal-actions" style="justify-content: center; gap: var(--space-lg);">
         <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
-        <button class="btn btn-danger" id="modal-confirm">Delete</button>
+        <button class="btn btn-danger" id="modal-confirm">Delete Forever</button>
       </div>
     `;
 
@@ -106,6 +109,9 @@
     // Existing initializes
     window.ThemeManager.init();
     window.SearchManager.init();
+    window.Palette.init();
+    window.Store.initSync(); // Setup background sync loop
+    window.Auth.init();
     window.Sidebar.init();
     window.NoteList.init();
     window.Editor.init();

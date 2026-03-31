@@ -1,0 +1,191 @@
+/* ============================================
+   PALETTE — Global Command Palette (Cmd+K)
+   ============================================ */
+
+.palette-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+
+.palette-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.palette-modal {
+  width: 100%;
+  max-width: 640px;
+  background: var(--bg-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2xl);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(-20px) scale(0.95);
+  transition: transform var(--transition-fast) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.palette-overlay.visible .palette-modal {
+  transform: translateY(0) scale(1);
+}
+
+/* ── Input Area ── */
+.palette-header {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-xl);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+}
+
+.palette-icon {
+  color: var(--text-tertiary);
+  font-size: 20px;
+  margin-right: var(--space-md);
+}
+
+.palette-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: var(--font-size-lg);
+  color: var(--text-primary);
+  padding: var(--space-xl) 0;
+}
+
+.palette-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.palette-hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  font-family: var(--font-mono);
+  box-shadow: var(--shadow-inset);
+  margin-left: var(--space-md);
+}
+
+/* ── Results Area ── */
+.palette-content {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  background: var(--bg-primary);
+}
+
+.palette-section-title {
+  padding: var(--space-xs) var(--space-md);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  margin-top: var(--space-sm);
+}
+
+.palette-section-title:first-child {
+  margin-top: 0;
+}
+
+/* ── Items ── */
+.palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-md);
+  margin: 2px 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.1s ease;
+  user-select: none;
+}
+
+.palette-item-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0; /* Enable truncate */
+}
+
+.palette-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--text-secondary);
+}
+
+.palette-item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.palette-item-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-item-subtitle {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.palette-item-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+  margin-left: var(--space-md);
+}
+
+/* Keyboard Navigation States */
+.palette-item:hover,
+.palette-item.active {
+  background: var(--accent-primary-glow);
+}
+
+.palette-item:hover .palette-item-title,
+.palette-item.active .palette-item-title {
+  color: var(--accent-primary);
+}
+
+.palette-item:hover .palette-item-icon,
+.palette-item.active .palette-item-icon {
+  color: var(--accent-primary);
+}
+
+/* Empty State */
+.palette-empty {
+  padding: var(--space-3xl) var(--space-md);
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+}
