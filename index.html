@@ -280,18 +280,32 @@
             <button class="bubble-btn" data-command="formatBlock" data-value="blockquote" title="Quote"><i class="ph ph-quotes"></i></button>
           </div>
 
-          <!-- Image Manipulation Toolbar -->
-          <div id="image-toolbar" class="image-toolbar" style="display:none;">
-            <button class="img-tool-btn" data-action="size-sm" title="Small (25%)">S</button>
-            <button class="img-tool-btn" data-action="size-md" title="Medium (50%)">M</button>
-            <button class="img-tool-btn" data-action="size-lg" title="Large (100%)">L</button>
+          <!-- 🧩 Unified Block Manipulation Toolbar (Contextual) -->
+          <div id="block-toolbar" class="block-toolbar" style="display:none;">
+            <!-- ... (existing tools) ... -->
+            <div class="block-tool-group" data-type="image">
+              <button class="block-tool-btn" data-action="size-sm" title="Small (25%)">S</button>
+              <button class="block-tool-btn" data-action="size-md" title="Medium (50%)">M</button>
+              <button class="block-tool-btn" data-action="size-lg" title="Large (100%)">L</button>
+            </div>
+            <div class="block-tool-group" data-type="table">
+              <button class="block-tool-btn" data-action="add-row" title="Add Row Below"><i class="ph ph-rows"></i></button>
+              <button class="block-tool-btn" data-action="add-col" title="Add Column Right"><i class="ph ph-columns"></i></button>
+            </div>
             <div class="bubble-divider"></div>
-            <button class="img-tool-btn" data-action="align-left" title="Align Left"><i class="ph ph-align-left"></i></button>
-            <button class="img-tool-btn" data-action="align-center" title="Align Center"><i class="ph ph-align-center"></i></button>
-            <button class="img-tool-btn" data-action="align-right" title="Align Right"><i class="ph ph-align-right"></i></button>
+            <button class="block-tool-btn" data-action="align-left" title="Align Left"><i class="ph ph-align-left"></i></button>
+            <button class="block-tool-btn" data-action="align-center" title="Align Center"><i class="ph ph-align-center"></i></button>
+            <button class="block-tool-btn" data-action="align-right" title="Align Right"><i class="ph ph-align-right"></i></button>
             <div class="bubble-divider"></div>
-            <button class="img-tool-btn trash" data-action="delete" title="Delete Image"><i class="ph ph-trash"></i></button>
+            <button class="block-tool-btn trash" data-action="delete" title="Purge Asset"><i class="ph ph-trash"></i></button>
           </div>
+
+          <!-- 💠 Direct Manipulation Overlays (Pro) -->
+          <div id="block-drag-handle" class="block-drag-handle" style="display:none;" draggable="true" title="Drag to reorder">
+            <i class="ph ph-dots-six-vertical"></i>
+          </div>
+          <div id="block-resizer" class="block-resizer" style="display:none;"></div>
+          <div id="drop-indicator" class="drop-indicator" style="display:none;"></div>
 
           <div id="slash-menu" class="slash-menu" style="display:none;">
             <div class="slash-menu-title">Commands</div>

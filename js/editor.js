@@ -15,7 +15,8 @@
       this._bindBody();
       this._bindActions();
       this._initInteractions();
-      this._initImageManager();
+      this._initBlockManager();
+      this._initDirectManipulation();
     },
 
     _initInteractions() {
@@ -209,8 +210,13 @@
           const file = e.target.files[0];
           if (file) {
             try {
+              window.showToast('🚀 Processing image...', 'info');
+              
+              // ✅ PRO: Compress image in-browser before upload (Target: 1920px max, WebP/JPEG)
+              const compressedFile = await this._compressImage(file);
+              
               const formData = new FormData();
-              formData.append('image', file);
+              formData.append('image', compressedFile);
               
               const token = window.Auth.getToken();
               const res = await fetch(`${window.API_BASE_URL}/sync/upload`, {
@@ -228,7 +234,7 @@
               
               document.execCommand('insertImage', false, fullUrl);
               this._scheduleAutoSave();
-              window.showToast('🖼️ Image uploaded to cloud', 'success');
+              window.showToast('🖼️ Optimized upload complete', 'success');
             } catch (err) {
               window.showToast('Upload failed: ' + err.message, 'danger');
             }
@@ -236,6 +242,52 @@
           imgInput.value = '';
         });
       }
+    },
+
+    // ✅ PRO: In-Browser Asset Compression (Canvas API)
+    async _compressImage(file) {
+      if (file.size < 200 * 1024) return file; // Don't touch small files
+      
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            // Limit to Pro resolution (1920px)
+            const MAX_SIZE = 1920;
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height *= MAX_SIZE / width;
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width *= MAX_SIZE / height;
+                height = MAX_SIZE;
+              }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            canvas.toBlob((blob) => {
+              const newFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+              });
+              resolve(newFile);
+            }, 'image/jpeg', 0.82); // 82% quality for best balance
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
     },
 
     _bindTitleInput() {
@@ -736,70 +788,271 @@
 
     /* ── Image Manipulation Engine ── */
 
-    _selectedImg: null,
+    /* ── Unified Block Manipulation Engine (Pro) ── */
 
-    _initImageManager() {
-      const toolbar = document.getElementById('image-toolbar');
-      if (!toolbar) return;
+    _selectedBlock: null,
 
-      document.querySelectorAll('.img-tool-btn').forEach(btn => {
+    _initBlockManager() {
+      const toolbar = document.getElementById('block-toolbar');
+      const body = document.getElementById('editor-body');
+      if (!toolbar || !body) return;
+
+      // Handle block selection via delegation
+      body.addEventListener('click', (e) => {
+        const block = e.target.closest('img, table, hr, blockquote');
+        if (block) {
+          this._handleBlockClick(block);
+        } else {
+          this._hideBlockToolbar();
+        }
+      });
+
+      // Bind toolbar actions
+      toolbar.querySelectorAll('.block-tool-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          this._handleImageAction(btn.dataset.action);
+          this._handleBlockAction(btn.dataset.action);
         });
+      });
+
+      // Hide toolbar on escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') this._hideBlockToolbar();
       });
     },
 
-    _handleImageClick(img) {
-      this._selectedImg = img;
+    _handleBlockClick(block) {
+      this._selectedBlock = block;
       
-      // Highlight image
-      document.querySelectorAll('.editor-body img').forEach(i => i.classList.remove('selected'));
-      img.classList.add('selected');
+      // Clear previous selection
+      document.querySelectorAll('.editor-body .selected').forEach(el => el.classList.remove('selected'));
+      block.classList.add('selected');
+      this._positionManipulationHandles(block);
 
-      // Position toolbar
-      const toolbar = document.getElementById('image-toolbar');
-      const rect = img.getBoundingClientRect();
+      const toolbar = document.getElementById('block-toolbar');
       
+      // Contextual UI Toggling
+      const type = block.tagName.toLowerCase();
+      toolbar.querySelectorAll('.block-tool-group').forEach(group => {
+        group.style.display = (group.dataset.type === type || (group.dataset.type === 'image' && type === 'img')) ? 'flex' : 'none';
+      });
+
+      // Positioning
+      const rect = block.getBoundingClientRect();
       toolbar.style.display = 'flex';
       toolbar.style.left = `${rect.left + rect.width / 2}px`;
       toolbar.style.top = `${rect.top + window.scrollY}px`;
     },
 
-    _hideImageToolbar() {
-      this._selectedImg = null;
-      document.querySelectorAll('.editor-body img').forEach(i => i.classList.remove('selected'));
-      const toolbar = document.getElementById('image-toolbar');
+    _hideBlockToolbar() {
+      this._selectedBlock = null;
+      document.querySelectorAll('.editor-body .selected').forEach(el => el.classList.remove('selected'));
+      const toolbar = document.getElementById('block-toolbar');
       if (toolbar) toolbar.style.display = 'none';
     },
 
-    _handleImageAction(action) {
-      if (!this._selectedImg) return;
-      const img = this._selectedImg;
+    _handleBlockAction(action) {
+      if (!this._selectedBlock) return;
+      const block = this._selectedBlock;
 
       switch(action) {
-        case 'size-sm': img.style.width = '25%'; break;
-        case 'size-md': img.style.width = '50%'; break;
-        case 'size-lg': img.style.width = '100%'; break;
+        // Image Sizes
+        case 'size-sm': block.style.width = '25%'; break;
+        case 'size-md': block.style.width = '50%'; break;
+        case 'size-lg': block.style.width = '100%'; break;
+        
+        // Alignment
         case 'align-left': 
-          img.className = 'selected align-left';
+          block.className = 'selected align-left';
           break;
         case 'align-center': 
-          img.className = 'selected align-center';
+          block.className = 'selected align-center';
           break;
         case 'align-right': 
-          img.className = 'selected align-right';
+          block.className = 'selected align-right';
           break;
+          
+        // Table Controls
+        case 'add-row':
+          if (block.tagName === 'TABLE') {
+            const row = block.insertRow(-1);
+            const colCount = block.rows[0].cells.length;
+            for (let i = 0; i < colCount; i++) {
+              const cell = row.insertCell(0);
+              cell.innerHTML = '&nbsp;';
+              cell.style.border = '1px solid var(--border-default)';
+              cell.style.padding = '12px';
+            }
+          }
+          break;
+          
+        case 'add-col':
+          if (block.tagName === 'TABLE') {
+            for (let i = 0; i < block.rows.length; i++) {
+              const cell = block.rows[i].insertCell(-1);
+              cell.innerHTML = '&nbsp;';
+              cell.style.border = '1px solid var(--border-default)';
+              cell.style.padding = '12px';
+            }
+          }
+          break;
+          
+        // Universal Delete
         case 'delete':
-          img.remove();
-          this._hideImageToolbar();
+          if (block.tagName === 'IMG') {
+            const src = block.getAttribute('src');
+            if (src && src.includes('/api/sync/image/')) {
+              const filename = src.split('/').pop();
+              const token = window.Auth.getToken();
+              fetch(`${window.API_BASE_URL}/sync/image/${filename}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+              }).catch(err => console.error('Asset GC Failed:', err));
+            }
+          }
+          block.remove();
+          this._hideBlockToolbar();
+          window.showToast('🗑️ Block purged successfully', 'info');
           break;
       }
       
       this._scheduleAutoSave();
-      // Reposition toolbar after size change
-      setTimeout(() => this._handleImageClick(img), 100);
+      // Reposition handles
+      if (document.contains(block)) {
+        setTimeout(() => {
+          this._handleBlockClick(block);
+          this._positionManipulationHandles(block);
+        }, 50);
+      }
+    },
+
+    /* ── 💠 Direct Manipulation Engine (Pro) ── */
+
+    _draggedBlock: null,
+    _resizingBlock: null,
+    _startWidth: 0,
+    _startX: 0,
+
+    _initDirectManipulation() {
+      const body = document.getElementById('editor-body');
+      const dragHandle = document.getElementById('block-drag-handle');
+      const resizer = document.getElementById('block-resizer');
+      const indicator = document.getElementById('drop-indicator');
+      if (!body || !dragHandle || !resizer) return;
+
+      // 1. Drag Handle Positioning (Hover)
+      body.addEventListener('mousemove', (e) => {
+        if (this._resizingBlock) return;
+        const block = e.target.closest('img, table, hr, blockquote, p, h1, h2, h3');
+        if (block && block.parentElement === body) {
+          const rect = block.getBoundingClientRect();
+          dragHandle.style.display = 'flex';
+          dragHandle.style.top = `${rect.top + window.scrollY}px`;
+          dragHandle.style.left = `${rect.left - 30}px`;
+          dragHandle._targetBlock = block;
+        } else {
+          dragHandle.style.display = 'none';
+        }
+      });
+
+      body.addEventListener('mouseleave', () => {
+        dragHandle.style.display = 'none';
+      });
+
+      // 2. Reordering Logic (Drag & Drop)
+      dragHandle.addEventListener('dragstart', (e) => {
+        this._draggedBlock = dragHandle._targetBlock;
+        e.dataTransfer.setData('text/plain', ''); // Required for FF
+        e.dataTransfer.effectAllowed = 'move';
+        this._draggedBlock.style.opacity = '0.4';
+        this._hideBlockToolbar();
+      });
+
+      dragHandle.addEventListener('dragend', () => {
+        if (this._draggedBlock) this._draggedBlock.style.opacity = '1';
+        indicator.style.display = 'none';
+        this._draggedBlock = null;
+      });
+
+      body.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const block = e.target.closest('img, table, hr, blockquote, p, h1, h2, h3');
+        if (block && block.parentElement === body && block !== this._draggedBlock) {
+          const rect = block.getBoundingClientRect();
+          const midpoint = rect.top + rect.height / 2;
+          indicator.style.display = 'block';
+          indicator.style.width = `${rect.width}px`;
+          indicator.style.left = `${rect.left}px`;
+          
+          if (e.clientY < midpoint) {
+            indicator.style.top = `${rect.top + window.scrollY - 4}px`;
+            indicator._dropPos = 'before';
+          } else {
+            indicator.style.top = `${rect.bottom + window.scrollY}px`;
+            indicator._dropPos = 'after';
+          }
+          indicator._targetBlock = block;
+        }
+      });
+
+      body.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (this._draggedBlock && indicator._targetBlock) {
+          if (indicator._dropPos === 'before') {
+            body.insertBefore(this._draggedBlock, indicator._targetBlock);
+          } else {
+            body.insertBefore(this._draggedBlock, indicator._targetBlock.nextSibling);
+          }
+          this._scheduleAutoSave();
+        }
+      });
+
+      // 3. Pixel-Perfect Resizing
+      resizer.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (!this._selectedBlock) return;
+        this._resizingBlock = this._selectedBlock;
+        this._startWidth = this._resizingBlock.offsetWidth;
+        this._startX = e.clientX;
+        this._resizingBlock.classList.add('resizing');
+        
+        const onMouseMove = (moveEvent) => {
+          if (!this._resizingBlock) return;
+          const deltaX = moveEvent.clientX - this._startX;
+          const newWidth = Math.max(50, Math.min(body.offsetWidth, this._startWidth + deltaX));
+          this._resizingBlock.style.width = `${newWidth}px`;
+          this._positionManipulationHandles(this._resizingBlock);
+        };
+
+        const onMouseUp = () => {
+          if (this._resizingBlock) {
+            this._resizingBlock.classList.remove('resizing');
+            this._resizingBlock = null;
+            this._scheduleAutoSave();
+          }
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+    },
+
+    // Extends _handleBlockClick to position resizer
+    _positionManipulationHandles(block) {
+      const resizer = document.getElementById('block-resizer');
+      if (!resizer) return;
+
+      if (['IMG', 'TABLE'].includes(block.tagName)) {
+        const rect = block.getBoundingClientRect();
+        resizer.style.display = 'block';
+        resizer.style.top = `${rect.bottom + window.scrollY - 6}px`;
+        resizer.style.left = `${rect.right - 6}px`;
+      } else {
+        resizer.style.display = 'none';
+      }
     }
   };
 })();

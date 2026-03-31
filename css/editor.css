@@ -697,17 +697,34 @@
   z-index: 150;
   pointer-events: auto;
   transform: translate(-50%, -100%) translateY(-12px);
+}
+
+/* 🧩 Unified Block Manipulation Toolbar */
+.block-toolbar {
+  position: absolute;
+  z-index: 1100;
+  background: var(--bg-primary-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: var(--shadow-lg);
+  transform: translate(-50%, -100%);
+  margin-top: -12px;
   animation: bubblePop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.img-tool-btn {
+.block-tool-btn {
   width: 32px;
   height: 32px;
-  border-radius: 4px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--text-secondary);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -716,32 +733,114 @@
   font-weight: 600;
 }
 
-.img-tool-btn:hover {
+.block-tool-btn:hover {
   background: var(--bg-tertiary);
   color: var(--accent-primary);
 }
 
-.img-tool-btn.trash:hover {
+.block-tool-btn.trash:hover {
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
 }
 
-/* Image Selection Outline */
-.editor-body img {
-  max-width: 100%;
-  border-radius: var(--radius-md);
-  transition: all 0.3s ease;
+.block-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 💠 Unified Block Selection Indicators */
+.editor-body img,
+.editor-body table,
+.editor-body hr,
+.editor-body blockquote {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
-  display: block;
-  margin: 1em 0;
+  position: relative;
 }
 
-.editor-body img.selected {
-  outline: 3px solid var(--accent-primary);
+.editor-body img.selected,
+.editor-body table.selected,
+.editor-body hr.selected,
+.editor-body blockquote.selected {
+  outline: 2px solid var(--accent-primary);
   outline-offset: 4px;
-  box-shadow: 0 0 0 8px var(--accent-primary-glow);
+  box-shadow: 0 0 0 6px var(--accent-primary-glow);
+  border-radius: 2px;
 }
 
-.editor-body img.align-left { margin-right: auto; margin-left: 0; }
-.editor-body img.align-center { margin-left: auto; margin-right: auto; }
-.editor-body img.align-right { margin-left: auto; margin-right: 0; }
+/* Alignment Classes for All Blocks */
+.selected.align-left { margin-right: auto !important; margin-left: 0 !important; }
+.selected.align-center { margin-left: auto !important; margin-right: auto !important; }
+.selected.align-right { margin-left: auto !important; margin-right: 0 !important; }
+
+/* Table Specific Polishing */
+.editor-body table {
+  max-width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.editor-body table td {
+  border: 1px solid var(--border-default);
+  padding: 12px;
+  min-width: 80px;
+}
+
+/* 💠 Direct Manipulation Overlays (Pro) */
+.block-drag-handle {
+  position: absolute;
+  left: -32px;
+  width: 24px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--text-tertiary);
+  background: var(--bg-primary-glass);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  z-index: 1000;
+  transition: transform 0.2s, color 0.2s;
+}
+
+.block-drag-handle:hover {
+  color: var(--accent-primary);
+  transform: scale(1.1);
+}
+
+.block-drag-handle:active {
+  cursor: grabbing;
+}
+
+.block-resizer {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--accent-primary);
+  border: 2px solid #fff;
+  border-radius: 2px;
+  cursor: nwse-resize;
+  z-index: 1001;
+  box-shadow: 0 0 10px var(--accent-primary-glow);
+}
+
+.drop-indicator {
+  position: absolute;
+  height: 4px;
+  background: var(--accent-primary);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 999;
+  box-shadow: 0 0 15px var(--accent-primary-glow);
+}
+
+.resizing {
+  transition: none !important;
+  user-select: none;
+}

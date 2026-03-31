@@ -54,7 +54,12 @@ const connectDB = async () => {
       bucketName: 'uploads'
     });
     app.set('gridfsBucket', gridfsBucket);
-    logger.info('GridFS Bucket initialized');
+    
+    // ✅ PERFORMANCE: Create index on filename for instant GridFS lookups
+    conn.connection.db.collection('uploads.files').createIndex({ filename: 1 }, { unique: true })
+      .catch(err => logger.error('GridFS Indexing failed', { error: err.message }));
+      
+    logger.info('GridFS Bucket initialized with performance indexing');
   } catch (err) {
     logger.error('Database connection failed', { error: err.message });
     process.exit(1);

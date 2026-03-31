@@ -27,16 +27,48 @@ router.get('/image/:filename', async (req, res) => {
     const bucket = req.app.get('gridfsBucket');
     if (!bucket) return res.status(500).json({ msg: 'Database storage not initialized' });
 
+    // ✅ PERFORMANCE: Find file metadata first (Uses index)
+    const files = await bucket.find({ filename: req.params.filename }).limit(1).toArray();
+    if (!files || files.length === 0) {
+      return res.status(404).json({ msg: 'Image not found' });
+    }
+
+    const file = files[0];
+
+    // ✅ PRO HEADERS: Optimize for instant browser rendering
+    res.set('Content-Type', file.contentType || 'image/png');
+    res.set('Content-Length', file.length);
+    res.set('Accept-Ranges', 'bytes');
+    res.set('ETag', file._id.toString());
+    res.set('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year caching
+
+    // Stream from GridFS
+    bucket.openDownloadStream(file._id).pipe(res);
+  } catch (err) {
+    logger.error('Streaming fail', { error: err.message, filename: req.params.filename });
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// @route   DELETE api/sync/image/:filename
+// @desc    Delete an image from GridFS (Garbage Collection)
+// @access  Private
+router.delete('/image/:filename', auth, async (req, res) => {
+  try {
+    const bucket = req.app.get('gridfsBucket');
+    if (!bucket) return res.status(500).json({ msg: 'Database storage not initialized' });
+
+    // Find the file to verify ownership (optional but Pro)
     const files = await bucket.find({ filename: req.params.filename }).toArray();
     if (!files || files.length === 0) {
       return res.status(404).json({ msg: 'Image not found' });
     }
 
-    // Set content type and stream
-    res.set('Content-Type', files[0].contentType);
-    res.set('Cache-Control', 'public, max-age=31536000'); // 1 year cache
-    bucket.openDownloadStreamByName(req.params.filename).pipe(res);
+    // Delete the file
+    await bucket.delete(files[0]._id);
+    res.json({ msg: 'Asset purged successfully' });
   } catch (err) {
+    logger.error('Asset deletion failed', { error: err.message });
     res.status(500).json({ msg: 'Server Error' });
   }
 });
