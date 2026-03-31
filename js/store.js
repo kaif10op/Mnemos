@@ -127,9 +127,9 @@ function getAllFolders() {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.FOLDERS);
     return data ? JSON.parse(data) : [
-      { id: '__default__', name: 'Personal', icon: '📝' },
-      { id: '__work__', name: 'Work', icon: '💼' },
-      { id: '__ideas__', name: 'Ideas', icon: '💡' },
+      { id: '__default__', name: 'Personal', icon: 'folder' },
+      { id: '__work__', name: 'Work', icon: 'briefcase' },
+      { id: '__ideas__', name: 'Ideas', icon: 'lightbulb' },
     ];
   } catch {
     return [];
@@ -140,7 +140,7 @@ function saveAllFolders(folders) {
   localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(folders));
 }
 
-function createFolder(name, icon = '📁') {
+function createFolder(name, icon = 'folder') {
   const folder = { id: generateId(), name, icon };
   const folders = getAllFolders();
   folders.push(folder);
@@ -212,10 +212,15 @@ function importData(file) {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        if (data.notes) saveAllNotes(data.notes);
-        if (data.folders) saveAllFolders(data.folders);
-        if (data.settings) {
-          localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(data.settings));
+        if (data.folders) {
+          const existingFolders = getAllFolders();
+          const toAdd = data.folders.filter(f => !existingFolders.some(ex => ex.id === f.id));
+          if (toAdd.length > 0) saveAllFolders([...existingFolders, ...toAdd]);
+        }
+        if (data.notes) {
+          const existingNotes = getAllNotes();
+          const toAdd = data.notes.filter(n => !existingNotes.some(ex => ex.id === n.id));
+          if (toAdd.length > 0) saveAllNotes([...existingNotes, ...toAdd]);
         }
         resolve(data);
       } catch (err) {

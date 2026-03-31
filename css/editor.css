@@ -70,19 +70,14 @@
 
 /* ── Toolbar ── */
 .editor-toolbar {
-  padding: var(--space-sm) var(--space-lg);
-  margin: var(--space-md) var(--space-2xl);
-  border-radius: var(--radius-full);
-  background: var(--bg-glass);
-  border: 1px solid var(--border-default);
+  padding: var(--space-sm) var(--space-2xl);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-primary);
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
   flex-shrink: 0;
   overflow-x: auto;
-  box-shadow: var(--shadow-md);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .toolbar-divider {

@@ -3,15 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Notes Saver — A beautiful, professional note-taking application with rich text editing, folders, tags, and more. All data stored locally." />
-  <meta name="theme-color" content="#0f0f14" />
-  <title>Notes Saver — Your Personal Note-Taking Space</title>
+  <meta name="description" content="Notes Saver — A premium workspace." />
+  <meta name="theme-color" content="#09090b" />
+  <title>Notes Saver — Workspace</title>
+  
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Premium Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
   <!-- Stylesheets -->
   <link rel="stylesheet" href="css/variables.css" />
@@ -25,7 +29,9 @@
 <body>
 
   <!-- Mobile Menu Button -->
-  <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle sidebar">☰</button>
+  <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle sidebar">
+    <i class="ph ph-list" style="font-size:24px;"></i>
+  </button>
 
   <!-- Sidebar Overlay (mobile) -->
   <div class="sidebar-overlay" id="sidebar-overlay"></div>
@@ -34,29 +40,30 @@
   <div id="app">
 
     <!-- ══════ SIDEBAR ══════ -->
-    <aside class="sidebar" role="navigation" aria-label="Note categories">
+    <aside class="sidebar" id="sidebar" role="navigation" aria-label="Note categories">
 
       <!-- Brand -->
       <div class="sidebar-header">
-        <div class="sidebar-logo">📝</div>
+        <div class="sidebar-logo"><i class="ph-duotone ph-notebook" style="font-size:24px;"></i></div>
         <div class="sidebar-brand">
           <h1>Notes Saver</h1>
-          <span>Your notes, your space</span>
+          <span>Premium Workspace</span>
         </div>
       </div>
 
       <!-- Search -->
       <div class="sidebar-search">
         <div class="search-wrapper">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon"><i class="ph ph-magnifying-glass" style="font-size:16px;"></i></span>
           <input
             type="text"
             id="search-input"
             class="search-input"
             placeholder="Search notes..."
+            aria-label="Search notes"
             autocomplete="off"
           />
-          <button class="search-clear" id="search-clear" aria-label="Clear search">✕</button>
+          <button class="search-clear" id="search-clear" aria-label="Clear search"><i class="ph ph-x" style="font-size:14px;"></i></button>
         </div>
       </div>
 
@@ -67,7 +74,9 @@
         <div class="sidebar-section">
           <div class="section-header">
             <span class="section-title">Folders</span>
-            <button class="section-action" id="add-folder-btn" title="New folder">+</button>
+            <button class="section-action" id="add-folder-btn" title="New folder" aria-label="Create new folder">
+              <i class="ph-bold ph-plus" style="font-size:14px;"></i>
+            </button>
           </div>
           <div id="folders-list"></div>
         </div>
@@ -84,13 +93,15 @@
 
       <!-- Footer -->
       <div class="sidebar-footer">
-        <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
-          <div class="theme-toggle-knob">🌙</div>
+        <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
+          <div class="theme-toggle-knob"><i class="ph-duotone ph-moon" style="font-size:16px;"></i></div>
         </button>
         <div class="sidebar-footer-actions">
-          <button class="sidebar-footer-btn" id="import-btn" title="Import notes">📤</button>
-          <button class="sidebar-footer-btn" id="export-btn" title="Export notes">📥</button>
-          <button class="sidebar-footer-btn" id="shortcuts-btn" title="Keyboard shortcuts" onclick="window.ShortcutManager._showShortcutsModal()">⌨️</button>
+          <button class="sidebar-footer-btn" id="import-btn" title="Import notes" aria-label="Import notes"><i class="ph-duotone ph-download-simple" style="font-size:20px;"></i></button>
+          <button class="sidebar-footer-btn" id="export-btn" title="Export notes" aria-label="Export notes"><i class="ph-duotone ph-upload-simple" style="font-size:20px;"></i></button>
+          <button class="sidebar-footer-btn" id="shortcuts-btn" title="Keyboard shortcuts" aria-label="Keyboard shortcuts" onclick="window.ShortcutManager._showShortcutsModal()">
+            <i class="ph-duotone ph-keyboard" style="font-size:20px;"></i>
+          </button>
         </div>
       </div>
     </aside>
@@ -100,18 +111,25 @@
 
       <!-- Header -->
       <div class="notelist-header">
-        <div>
+        <div class="notelist-header-left" style="display:flex; align-items:center; gap:8px;">
+          <button class="sidebar-toggle-btn desktop-only tooltip-btn" id="sidebar-toggle-btn" aria-label="Toggle Sidebar" title="Toggle Sidebar (Cmd+\)">
+            <i class="ph ph-sidebar-simple" style="font-size:20px;"></i>
+          </button>
           <span class="notelist-title">All Notes</span>
-          <span class="notelist-count" id="notelist-count">0</span>
         </div>
-        <button class="new-note-btn" id="new-note-btn" title="New note (Ctrl+N)">+</button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="notelist-count" id="notelist-count">0</span>
+          <button class="new-note-btn" id="new-note-btn" title="New note (Ctrl+N)" aria-label="Create new note">
+            <i class="ph-bold ph-plus" style="font-size:20px;"></i>
+          </button>
+        </div>
       </div>
 
       <!-- Sort Bar -->
       <div class="notelist-sort">
-        <button class="sort-btn active" data-sort="updated">Recent</button>
-        <button class="sort-btn" data-sort="title">A–Z</button>
-        <button class="sort-btn" data-sort="created">Created</button>
+        <button class="sort-btn active" data-sort="updated" aria-label="Sort by recent">Recent</button>
+        <button class="sort-btn" data-sort="title" aria-label="Sort alphabetically">A–Z</button>
+        <button class="sort-btn" data-sort="created" aria-label="Sort by creation date">Created</button>
       </div>
 
       <!-- Note Cards -->
@@ -119,7 +137,7 @@
 
       <!-- Empty State -->
       <div class="notelist-empty" id="notelist-empty" style="display: none;">
-        <div class="notelist-empty-icon">📄</div>
+        <div class="notelist-empty-icon"><i class="ph-duotone ph-file-text" style="font-size:64px;"></i></div>
         <h3>No notes yet</h3>
         <p>Create your first note to get started</p>
       </div>
@@ -131,62 +149,57 @@
 
       <!-- Empty Editor State -->
       <div class="editor-empty" id="editor-empty-state">
-        <div class="editor-empty-icon">✏️</div>
+        <div class="editor-empty-icon"><i class="ph-duotone ph-pencil-simple" style="font-size:64px;"></i></div>
         <h2>Select a note to start editing</h2>
         <p>Choose a note from the list or create a new one</p>
         <div class="editor-empty-shortcuts">
-          <div class="shortcut-hint">
-            <kbd class="kbd">Ctrl+N</kbd>
-            <span>New note</span>
-          </div>
-          <div class="shortcut-hint">
-            <kbd class="kbd">Ctrl+F</kbd>
-            <span>Search</span>
-          </div>
-          <div class="shortcut-hint">
-            <kbd class="kbd">Ctrl+/</kbd>
-            <span>All shortcuts</span>
-          </div>
+          <div class="shortcut-hint"><kbd class="kbd">Ctrl+N</kbd><span>New note</span></div>
+          <div class="shortcut-hint"><kbd class="kbd">Ctrl+F</kbd><span>Search</span></div>
+          <div class="shortcut-hint"><kbd class="kbd">Ctrl+/</kbd><span>All shortcuts</span></div>
         </div>
       </div>
 
-      <!-- Active Editor (hidden initially) -->
+      <!-- Active Editor -->
       <div id="editor-active" style="display: none; flex-direction: column; height: 100%;">
 
         <!-- Editor Header -->
         <div class="editor-header">
           <div class="editor-header-left">
-            <button class="mobile-back-btn" id="mobile-back-btn" aria-label="Back to list">←</button>
+            <button class="mobile-back-btn" id="mobile-back-btn" aria-label="Back to list"><i class="ph-bold ph-arrow-left" style="font-size:20px;"></i></button>
           </div>
           <div class="editor-header-actions">
-            <button class="editor-action-btn" id="pin-btn" title="Pin note">📍</button>
-            <button class="editor-action-btn" id="delete-note-btn" title="Delete note">🗑️</button>
+            <button class="editor-action-btn" id="copy-btn" title="Copy to clipboard" aria-label="Copy to clipboard"><i class="ph-bold ph-copy" style="font-size:18px;"></i></button>
+            <button class="editor-action-btn" id="share-btn" title="Share note" aria-label="Share note"><i class="ph-bold ph-share-network" style="font-size:18px;"></i></button>
+            <button class="editor-action-btn" id="pin-btn" title="Pin note" aria-label="Pin note"><i class="ph-bold ph-push-pin" style="font-size:18px;"></i></button>
+            <button class="editor-action-btn" id="delete-note-btn" title="Delete note" aria-label="Delete note"><i class="ph-bold ph-trash" style="font-size:18px;"></i></button>
           </div>
         </div>
 
         <!-- Toolbar -->
         <div class="editor-toolbar" role="toolbar" aria-label="Formatting options">
-          <select class="toolbar-select" id="heading-select" title="Heading level">
-            <option value="">Heading</option>
+          <select class="toolbar-select" id="heading-select" title="Heading level" aria-label="Select heading level">
+            <option value="">Text Level</option>
             <option value="h1">Heading 1</option>
             <option value="h2">Heading 2</option>
             <option value="h3">Heading 3</option>
             <option value="p">Paragraph</option>
           </select>
           <div class="toolbar-divider"></div>
-          <button class="toolbar-btn" data-command="bold" title="Bold (Ctrl+B)"><b>B</b></button>
-          <button class="toolbar-btn" data-command="italic" title="Italic (Ctrl+I)"><i>I</i></button>
-          <button class="toolbar-btn" data-command="underline" title="Underline (Ctrl+U)"><u>U</u></button>
-          <button class="toolbar-btn" data-command="strikeThrough" title="Strikethrough"><s>S</s></button>
+          <button class="toolbar-btn" data-command="bold" title="Bold (Ctrl+B)" aria-label="Bold"><i class="ph-bold ph-text-b" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i class="ph-bold ph-text-italic" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="underline" title="Underline (Ctrl+U)" aria-label="Underline"><i class="ph-bold ph-text-underline" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><i class="ph-bold ph-text-strikethrough" style="font-size: 16px;"></i></button>
           <div class="toolbar-divider"></div>
-          <button class="toolbar-btn" data-command="insertUnorderedList" title="Bullet list">•≡</button>
-          <button class="toolbar-btn" data-command="insertOrderedList" title="Numbered list">1.</button>
-          <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Quote">❝</button>
-          <button class="toolbar-btn" data-command="formatBlock" data-value="pre" title="Code block">&lt;/&gt;</button>
+          <button class="toolbar-btn" data-command="insertUnorderedList" title="Bullet list" aria-label="Bullet list"><i class="ph-bold ph-list-bullets" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="insertOrderedList" title="Numbered list" aria-label="Numbered list"><i class="ph-bold ph-list-numbers" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Quote" aria-label="Quote"><i class="ph-bold ph-quotes" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="formatBlock" data-value="pre" title="Code block" aria-label="Code block"><i class="ph-bold ph-code" style="font-size: 16px;"></i></button>
           <div class="toolbar-divider"></div>
-          <button class="toolbar-btn" data-command="createLink" title="Insert link">🔗</button>
-          <button class="toolbar-btn" data-command="insertHorizontalRule" title="Horizontal rule">—</button>
-          <button class="toolbar-btn" data-command="removeFormat" title="Clear formatting">🧹</button>
+          <button class="toolbar-btn" data-command="createLink" title="Insert link" aria-label="Insert link"><i class="ph-bold ph-link" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" id="insert-image-btn" title="Insert image" aria-label="Insert image"><i class="ph-bold ph-image" style="font-size: 16px;"></i></button>
+          <input type="file" id="image-upload-input" accept="image/*" style="display: none;" aria-hidden="true" />
+          <button class="toolbar-btn" data-command="insertHorizontalRule" title="Horizontal rule" aria-label="Insert horizontal rule"><i class="ph-bold ph-minus" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="removeFormat" title="Clear formatting" aria-label="Clear formatting"><i class="ph-bold ph-eraser" style="font-size: 16px;"></i></button>
         </div>
 
         <!-- Title -->
@@ -196,18 +209,20 @@
             id="editor-title"
             class="editor-title"
             placeholder="Note title..."
+            aria-label="Note title input"
             autocomplete="off"
           />
         </div>
 
         <!-- Tags -->
         <div class="editor-tags-wrapper">
-          <div id="editor-tags"></div>
+          <div id="editor-tags" aria-live="polite"></div>
           <input
             type="text"
             id="tag-input"
             class="tag-input"
             placeholder="Add tag..."
+            aria-label="Tag input"
             autocomplete="off"
           />
         </div>
@@ -221,7 +236,7 @@
             spellcheck="true"
             role="textbox"
             aria-multiline="true"
-            aria-label="Note content"
+            aria-label="Note content editable area"
           ></div>
         </div>
 
@@ -232,8 +247,8 @@
             <span id="char-count">0 chars</span>
           </div>
           <div class="editor-save-status">
-            <span class="save-dot"></span>
-            <span id="save-status-label">Saved</span>
+            <span class="save-dot" aria-hidden="true"></span>
+            <span id="save-status-label" aria-live="polite">Saved</span>
           </div>
         </div>
 
@@ -243,14 +258,14 @@
   </div>
 
   <!-- ══════ TOAST CONTAINER ══════ -->
-  <div class="toast-container" id="toast-container"></div>
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
   <!-- ══════ MODAL ══════ -->
-  <div class="modal-overlay" id="modal-overlay">
+  <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal" id="modal"></div>
   </div>
 
-  <!-- Scripts (order matters) -->
+  <!-- Scripts -->
   <script src="js/store.js"></script>
   <script src="js/theme.js"></script>
   <script src="js/search.js"></script>

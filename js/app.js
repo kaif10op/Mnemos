@@ -3,22 +3,32 @@
    ============================================ */
 
 (function () {
+  // ── Central Icon Manager ──
+  window.AppIcons = {
+    render() {
+      // Phosphor auto-updates via web fonts, so this is just a dummy function for backward-compatibility.
+    }
+  };
+
   // ── Toast System ──
   window.showToast = function (message, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
 
     const icons = {
-      success: '✅',
-      danger: '❌',
-      info: 'ℹ️',
-      warning: '⚠️',
+      success: 'ph-fill ph-check-circle',
+      danger: 'ph-fill ph-warning-circle',
+      info: 'ph-fill ph-info',
+      warning: 'ph-fill ph-warning',
     };
+
+    const iconClass = icons[type] || icons.info;
 
     const toast = document.createElement('div');
     toast.className = 'toast';
-    toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span> ${message}`;
+    toast.innerHTML = `<span class="toast-icon"><i class="${iconClass}" style="font-size:18px;"></i></span> ${message}`;
     container.appendChild(toast);
+    window.AppIcons.render();
 
     setTimeout(() => {
       toast.classList.add('toast-exit');
@@ -75,8 +85,25 @@
     };
   };
 
-  // ── Initialize Everything ──
+  // ── Bootstrap ──
   document.addEventListener('DOMContentLoaded', () => {
+    
+    // Sidebar Toggle Logic
+    const toggleBtn = document.getElementById('sidebar-toggle-btn');
+    const appEl = document.getElementById('app');
+    
+    if (localStorage.getItem('sidebar_collapsed') === 'true') {
+      appEl.classList.add('sidebar-collapsed');
+    }
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const isCollapsed = appEl.classList.toggle('sidebar-collapsed');
+        localStorage.setItem('sidebar_collapsed', isCollapsed);
+      });
+    }
+
+    // Existing initializes
     window.ThemeManager.init();
     window.SearchManager.init();
     window.Sidebar.init();

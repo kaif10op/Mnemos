@@ -49,7 +49,7 @@
                style="animation-delay: ${idx * 30}ms">
             <div class="note-card-header">
               <span class="note-card-title">${this._escapeHtml(title)}</span>
-              ${note.pinned ? '<span class="note-card-pin">📌</span>' : ''}
+              ${note.pinned ? '<span class="note-card-pin"><i class="ph-fill ph-push-pin" style="font-size:14px;fill:var(--accent-primary);"></i></span>' : ''}
             </div>
             <p class="note-card-preview">${this._escapeHtml(preview)}</p>
             <div class="note-card-footer">
@@ -69,6 +69,8 @@
           window.Editor.open(id);
         });
       });
+
+      window.AppIcons.render();
     },
 
     _bindNewNote() {

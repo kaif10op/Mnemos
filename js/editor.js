@@ -84,6 +84,25 @@
           document.getElementById('editor-body').focus();
         });
       }
+
+      // Image upload
+      const insertImgBtn = document.getElementById('insert-image-btn');
+      const imgInput = document.getElementById('image-upload-input');
+      if (insertImgBtn && imgInput) {
+        insertImgBtn.addEventListener('click', () => imgInput.click());
+        imgInput.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              document.execCommand('insertImage', false, ev.target.result);
+              this._scheduleAutoSave();
+            };
+            reader.readAsDataURL(file);
+          }
+          imgInput.value = '';
+        });
+      }
     },
 
     _bindTitleInput() {
@@ -137,11 +156,18 @@
         });
 
         body.addEventListener('keydown', (e) => {
-          // Tab to indent
+          // Tab to indent properly instead of outdent block
           if (e.key === 'Tab') {
             e.preventDefault();
-            document.execCommand(e.shiftKey ? 'outdent' : 'indent');
+            document.execCommand('insertText', false, '  ');
           }
+        });
+
+        body.addEventListener('paste', (e) => {
+          e.preventDefault();
+          const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+          document.execCommand('insertText', false, text);
+          this._scheduleAutoSave();
         });
 
         body.addEventListener('mouseup', () => this._updateToolbarState());
@@ -150,6 +176,38 @@
     },
 
     _bindActions() {
+      // Copy button
+      const copyBtn = document.getElementById('copy-btn');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+          if (!currentNoteId) return;
+          const note = window.Store.getNote(currentNoteId);
+          const content = document.getElementById('editor-body').innerText || '';
+          const textToCopy = (note.title ? note.title + '\n\n' : '') + content;
+          navigator.clipboard.writeText(textToCopy).then(() => {
+            window.showToast('📋 Copied to clipboard', 'success');
+          });
+        });
+      }
+
+      // Share button
+      const shareBtn = document.getElementById('share-btn');
+      if (shareBtn) {
+        shareBtn.addEventListener('click', () => {
+          if (!currentNoteId) return;
+          const note = window.Store.getNote(currentNoteId);
+          const content = document.getElementById('editor-body').innerText || '';
+          if (navigator.share) {
+            navigator.share({
+              title: note.title || 'Untitled Note',
+              text: content,
+            }).catch(() => {});
+          } else {
+            window.showToast('Share not supported on this browser', 'warning');
+          }
+        });
+      }
+
       // Pin button
       const pinBtn = document.getElementById('pin-btn');
       if (pinBtn) {
@@ -260,7 +318,8 @@
       if (btn) {
         btn.classList.toggle('pinned', pinned);
         btn.title = pinned ? 'Unpin note' : 'Pin note';
-        btn.innerHTML = pinned ? '📌' : '📍';
+        btn.innerHTML = pinned ? '<i class="ph-fill ph-push-pin" style="font-size:18px;"></i>' : '<i class="ph-bold ph-push-pin" style="font-size:18px;"></i>';
+        window.AppIcons.render();
       }
     },
 

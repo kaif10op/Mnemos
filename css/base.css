@@ -21,20 +21,11 @@ body {
   line-height: var(--line-height-base);
   color: var(--text-primary);
   background: var(--bg-primary);
-  background-image: 
-    radial-gradient(circle at 10% 50%, rgba(188, 40, 233, 0.06), transparent 25%),
-    radial-gradient(circle at 90% 20%, rgba(13, 240, 227, 0.04), transparent 25%);
   height: 100%;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background var(--transition-slow), color var(--transition-slow);
-}
-
-[data-theme="light"] body {
-  background-image: 
-    radial-gradient(circle at 10% 50%, rgba(138, 43, 226, 0.04), transparent 25%),
-    radial-gradient(circle at 90% 20%, rgba(13, 240, 227, 0.02), transparent 25%);
 }
 
 /* ── Scrollbar Styling ── */
@@ -167,4 +158,46 @@ img {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* ── Accessibility ── */
+*:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  transition: outline-offset 0.1s ease;
+}
+
+/* Specific elements where standard outline works best */
+input:focus-visible, button:focus-visible, select:focus-visible, [contenteditable="true"]:focus-visible, [tabindex="0"]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* ── Print Styles ── */
+@media print {
+  .sidebar, .notelist, .editor-header, .editor-toolbar, .editor-footer, .editor-tags-wrapper, .mobile-menu-btn, .toast-container {
+    display: none !important;
+  }
+  
+  #app {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+
+  .editor-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    overflow: visible;
+  }
+
+  .editor-body {
+    color: black !important;
+  }
 }

@@ -36,20 +36,24 @@
 
       container.innerHTML = `
         <div class="nav-item active" data-filter="all" id="nav-all-notes">
-          <span class="nav-item-icon">📋</span>
+          <span class="nav-item-icon"><i class="ph-duotone ph-layers" style="font-size:16px;"></i></span>
           <span class="nav-item-label">All Notes</span>
           <span class="nav-item-count">${allCount}</span>
         </div>
-        ${folders.map(f => `
+        ${folders.map(f => {
+          const iconName = ['folder', 'briefcase', 'lightbulb', 'star', 'tag', 'bookmark', 'book', 'layers', 'package'].includes(f.icon) ? f.icon : 'folder';
+          return `
           <div class="nav-item" data-filter="folder" data-folder-id="${f.id}">
-            <span class="nav-item-icon">${f.icon}</span>
-            <span class="nav-item-label">${f.name}</span>
+            <span class="nav-item-icon"><i class="ph-duotone ph-${iconName}" style="font-size:16px;"></i></span>
+            <span class="nav-item-label">${this._escapeHtml(f.name)}</span>
             <span class="nav-item-count">${window.Store.getNotesCountByFolder(f.id)}</span>
             <div class="nav-item-actions">
-              <button class="nav-item-action-btn folder-delete-btn" data-folder-id="${f.id}" title="Delete folder">🗑️</button>
+              <button class="nav-item-action-btn folder-delete-btn" data-folder-id="${f.id}" title="Delete folder" aria-label="Delete folder">
+                <i class="ph-bold ph-trash" style="font-size:14px;"></i>
+              </button>
             </div>
           </div>
-        `).join('')}
+        `}).join('')}
       `;
 
       // Bind clicks
@@ -86,10 +90,12 @@
             }
             this.renderFolders();
             window.NoteList.render();
-            window.showToast('📂 Folder deleted', 'info');
+            window.showToast('Folder deleted', 'info');
           });
         });
       });
+
+      window.AppIcons.render();
     },
 
     renderTags() {
@@ -124,6 +130,8 @@
           this._closeMobileMenu();
         });
       });
+
+      window.AppIcons.render();
     },
 
     _bindAllNotes() {
@@ -136,11 +144,11 @@
         btn.addEventListener('click', () => {
           const name = prompt('Folder name:');
           if (name && name.trim()) {
-            const icons = ['📂', '📁', '🗂️', '📚', '🏷️', '⭐', '🔖'];
+            const icons = ['folder', 'briefcase', 'book', 'layers', 'package', 'star', 'bookmark'];
             const icon = icons[Math.floor(Math.random() * icons.length)];
             window.Store.createFolder(name.trim(), icon);
             this.renderFolders();
-            window.showToast('📂 Folder created', 'success');
+            window.showToast('Folder created', 'success');
           }
         });
       }
@@ -205,5 +213,12 @@
       document.querySelector('.sidebar')?.classList.remove('open');
       document.getElementById('sidebar-overlay')?.classList.remove('visible');
     },
+
+    _escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
   };
 })();
