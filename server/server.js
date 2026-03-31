@@ -79,6 +79,9 @@ const connectDB = async () => {
       logger.info('Using MongoDB URI from .env');
     }
 
+    // 🚀 Disable Mongoose's silent buffering trap. Fail fast in Serverless!
+    mongoose.set('bufferCommands', false);
+
     // Connect with optimized Serverless pooling limits
     const conn = await mongoose.connect(mongoUri, {
       maxPoolSize: 10,
@@ -109,6 +112,25 @@ const connectDB = async () => {
 connectDB();
 
 const path = require('path');
+
+// 🚨 VERCEL DIAGNOSTIC INTERCEPTOR: Prevent 15-second silent timeouts.
+// If MongoDB Atlas firewalls Vercel, actively report it rather than crashing the container!
+app.use(async (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    let attempts = 0;
+    while (mongoose.connection.readyState === 2 && attempts < 100) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      attempts++;
+    }
+    if (mongoose.connection.readyState === 0) {
+      return res.status(503).json({
+        msg: '🚨 FIREWALL ERROR: Vercel cannot reach MongoDB Atlas! You must open Atlas Network Access to 0.0.0.0/0 AND ensure MONGO_URI is properly saved in the Vercel Dashboard.',
+        code: 'MONGODB_UNREACHABLE_TIMEOUT'
+      });
+    }
+  }
+  next();
+});
 
 // Define Routes
 app.use('/api/auth', require('./routes/auth'));
