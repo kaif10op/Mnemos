@@ -11,8 +11,22 @@ const app = express();
 app.set('trust proxy', 1);
 
 // 🚀 ABSOLUTE PRIORITY: CORS must be the first middleware to handle all preflights/errors
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5050',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5050',
+  'https://mnemos-sigma.vercel.app'
+];
+
 app.use(cors({
-  origin: true, // Dynamically reflect the incoming origin in development
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']

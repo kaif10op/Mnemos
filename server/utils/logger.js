@@ -23,6 +23,10 @@ const customLevels = {
 
 winston.addColors(customLevels.colors);
 
+// Serverless (Vercel) has a Read-Only File System.
+// We must ONLY use Console transports in production.
+const isServerless = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+
 // Create logger instance
 const logger = winston.createLogger({
   levels: customLevels.levels,
@@ -32,39 +36,38 @@ const logger = winston.createLogger({
     winston.format.json()
   ),
   defaultMeta: { service: 'mnemos-server' },
-  transports: [
-    // Error logs
-    new winston.transports.File({
-      filename: path.join(__dirname, '../logs/error.log'),
-      level: 'error',
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-      )
-    }),
-    // All logs
-    new winston.transports.File({
-      filename: path.join(__dirname, '../logs/combined.log'),
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-      )
-    })
-  ]
+  transports: isServerless 
+    ? [new winston.transports.Console()] // Vercel captures stdout logs automatically
+    : [
+        // Error logs (Local Only)
+        new winston.transports.File({
+          filename: path.join(__dirname, '../logs/error.log'),
+          level: 'error',
+          format: winston.format.combine(
+            winston.format.timestamp(),
+            winston.format.json()
+          )
+        }),
+        // All logs (Local Only)
+        new winston.transports.File({
+          filename: path.join(__dirname, '../logs/combined.log'),
+          format: winston.format.combine(
+            winston.format.timestamp(),
+            winston.format.json()
+          )
+        }),
+        // Console logging in local dev
+        new winston.transports.Console({
+          format: winston.format.combine(
+            winston.format.colorize(),
+            winston.format.printf(({ timestamp, level, message, ...meta }) => {
+              const metaStr = Object.keys(meta).length ? JSON.stringify(meta) : '';
+              return `${timestamp} [${level}]: ${message} ${metaStr}`;
+            })
+          )
+        })
+      ]
 });
-
-// Add console logging in development
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.printf(({ timestamp, level, message, ...meta }) => {
-        const metaStr = Object.keys(meta).length ? JSON.stringify(meta) : '';
-        return `${timestamp} [${level}]: ${message} ${metaStr}`;
-      })
-    )
-  }));
-}
 
 /**
  * HTTP Request logging middleware

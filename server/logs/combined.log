@@ -2010,3 +2010,65 @@
 {"duration":"211ms","ip":"::ffff:127.0.0.1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 01:58:44","userId":"69cbdf2e43910afedf1152a8"}
 {"duration":"1ms","ip":"::ffff:127.0.0.1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 01:58:59","userId":"69cbdf2e43910afedf1152a8"}
 {"duration":"303ms","ip":"::ffff:127.0.0.1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:00:00","userId":"69cbdf2e43910afedf1152a8"}
+{"level":"info","message":"Using MongoDB URI from .env","service":"mnemos-server","timestamp":"2026-04-01 02:13:20"}
+{"level":"info","message":"Using MongoDB URI from .env","service":"mnemos-server","timestamp":"2026-04-01 02:13:20"}
+{"env":"development","level":"info","message":"Server started on port 5050","service":"mnemos-server","timestamp":"2026-04-01 02:13:20"}
+{"env":"development","level":"info","message":"Server started on port 5050","service":"mnemos-server","timestamp":"2026-04-01 02:13:20"}
+{"level":"info","message":"MongoDB Connected","service":"mnemos-server","timestamp":"2026-04-01 02:13:21"}
+{"level":"info","message":"MongoDB Connected","service":"mnemos-server","timestamp":"2026-04-01 02:13:21"}
+{"level":"info","message":"GridFS Bucket initialized with performance indexing","service":"mnemos-server","timestamp":"2026-04-01 02:13:21"}
+{"level":"info","message":"GridFS Bucket initialized with performance indexing","service":"mnemos-server","timestamp":"2026-04-01 02:13:21"}
+{"level":"info","message":"Using MongoDB URI from .env","service":"mnemos-server","timestamp":"2026-04-01 02:15:14"}
+{"env":"development","level":"info","message":"Server started on port 5050","service":"mnemos-server","timestamp":"2026-04-01 02:15:14"}
+{"level":"info","message":"Using MongoDB URI from .env","service":"mnemos-server","timestamp":"2026-04-01 02:15:14"}
+{"env":"development","level":"info","message":"Server started on port 5050","service":"mnemos-server","timestamp":"2026-04-01 02:15:14"}
+{"level":"info","message":"MongoDB Connected","service":"mnemos-server","timestamp":"2026-04-01 02:15:15"}
+{"level":"info","message":"GridFS Bucket initialized with performance indexing","service":"mnemos-server","timestamp":"2026-04-01 02:15:15"}
+{"level":"info","message":"MongoDB Connected","service":"mnemos-server","timestamp":"2026-04-01 02:15:15"}
+{"level":"info","message":"GridFS Bucket initialized with performance indexing","service":"mnemos-server","timestamp":"2026-04-01 02:15:15"}
+{"duration":"85ms","ip":"::1","level":"info","message":"POST /google","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:16:39","userId":"anonymous"}
+{"duration":"1ms","ip":"::1","level":"warn","message":"HEAD /me","service":"mnemos-server","status":401,"timestamp":"2026-04-01 02:20:13","userId":"anonymous"}
+{"level":"info","message":"Using MongoDB URI from .env","service":"mnemos-server","timestamp":"2026-04-01 02:20:57"}
+{"env":"development","level":"info","message":"Server started on port 5050","service":"mnemos-server","timestamp":"2026-04-01 02:20:57"}
+{"level":"info","message":"Using MongoDB URI from .env","service":"mnemos-server","timestamp":"2026-04-01 02:20:57"}
+{"env":"development","level":"info","message":"Server started on port 5050","service":"mnemos-server","timestamp":"2026-04-01 02:20:57"}
+{"level":"info","message":"MongoDB Connected","service":"mnemos-server","timestamp":"2026-04-01 02:20:58"}
+{"level":"info","message":"MongoDB Connected","service":"mnemos-server","timestamp":"2026-04-01 02:20:58"}
+{"level":"info","message":"GridFS Bucket initialized with performance indexing","service":"mnemos-server","timestamp":"2026-04-01 02:20:58"}
+{"level":"info","message":"GridFS Bucket initialized with performance indexing","service":"mnemos-server","timestamp":"2026-04-01 02:20:58"}
+{"duration":"233ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:21:52","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"3ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:21:53","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"1ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:21:59","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"2ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:14","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"395ms","ip":"::1","level":"info","message":"POST /","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:19","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"1397ms","ip":"::1","level":"info","message":"GET /image/ba4a8b91eb03b301683af5a0d7d7952d.png","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:20","userId":"anonymous"}
+{"duration":"1376ms","ip":"::1","level":"info","message":"GET /image/ba4a8b91eb03b301683af5a0d7d7952d.png","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:23","userId":"anonymous"}
+{"duration":"480ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:29","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"474ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:29","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"1632ms","ip":"::1","level":"info","message":"GET /image/ba4a8b91eb03b301683af5a0d7d7952d.png","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:33","userId":"anonymous"}
+{"duration":"1563ms","ip":"::1","level":"info","message":"POST /","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:38","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"1725ms","ip":"::1","level":"info","message":"GET /image/ba4a8b91eb03b301683af5a0d7d7952d.png","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:38","userId":"anonymous"}
+{"duration":"1006ms","ip":"::1","level":"info","message":"POST /","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:42","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"191ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:44","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"1985ms","ip":"::1","level":"info","message":"GET /image/ba4a8b91eb03b301683af5a0d7d7952d.png","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:22:45","userId":"anonymous"}
+{"duration":"298ms","ip":"::1","level":"warn","message":"POST /login","service":"mnemos-server","status":400,"timestamp":"2026-04-01 02:22:55","userId":"anonymous"}
+{"duration":"425ms","ip":"::1","level":"info","message":"POST /login","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:23:13","userId":"anonymous"}
+{"duration":"134ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:23:14","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"1ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:23:28","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"516ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:23:44","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"1ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:23:59","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"156ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:24:14","userId":"69cbdf2e43910afedf1152a8"}
+{"level":"info","message":"Using MongoDB URI from .env","service":"mnemos-server","timestamp":"2026-04-01 02:24:19"}
+{"env":"development","level":"info","message":"Server started on port 5050","service":"mnemos-server","timestamp":"2026-04-01 02:24:19"}
+{"level":"info","message":"Using MongoDB URI from .env","service":"mnemos-server","timestamp":"2026-04-01 02:24:19"}
+{"env":"development","level":"info","message":"Server started on port 5050","service":"mnemos-server","timestamp":"2026-04-01 02:24:19"}
+{"level":"info","message":"MongoDB Connected","service":"mnemos-server","timestamp":"2026-04-01 02:24:20"}
+{"level":"info","message":"MongoDB Connected","service":"mnemos-server","timestamp":"2026-04-01 02:24:20"}
+{"level":"info","message":"GridFS Bucket initialized with performance indexing","service":"mnemos-server","timestamp":"2026-04-01 02:24:20"}
+{"level":"info","message":"GridFS Bucket initialized with performance indexing","service":"mnemos-server","timestamp":"2026-04-01 02:24:20"}
+{"duration":"140ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:24:29","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"1ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:24:44","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"228ms","ip":"::1","level":"info","message":"POST /","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:24:55","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"457ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:24:59","userId":"69cbdf2e43910afedf1152a8"}
+{"duration":"137ms","ip":"::1","level":"info","message":"POST /google","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:25:19","userId":"anonymous"}
+{"duration":"2ms","ip":"::1","level":"info","message":"GET /status","service":"mnemos-server","status":200,"timestamp":"2026-04-01 02:25:19","userId":"69cbdf2e43910afedf1152a8"}

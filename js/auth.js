@@ -3,7 +3,14 @@
    ============================================ */
 
 // 🔑 Use relative path for same-origin requests (eliminates CORS entirely)
-const configuredApiBaseUrl = localStorage.getItem('notesaver_api_base_url');
+let configuredApiBaseUrl = localStorage.getItem('notesaver_api_base_url');
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+// If running locally, strictly reject any old cached '/api' string from localStorage and force port 5050
+if (isLocalhost && (!configuredApiBaseUrl || configuredApiBaseUrl === '/api')) {
+  configuredApiBaseUrl = 'http://localhost:5050/api';
+}
+
 window.API_BASE_URL = window.API_BASE_URL || configuredApiBaseUrl || '/api';
 
 // 🚀 FIREBASE INITIALIZATION
