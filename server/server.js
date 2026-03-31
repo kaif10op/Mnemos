@@ -6,6 +6,10 @@ const { logger, requestLogger } = require('./utils/logger');
 
 const app = express();
 
+// ✅ VERCEL PROXY SUPPORT
+// Required for reliable IP-based rate limiting behind Vercel's edge network
+app.set('trust proxy', 1);
+
 // 🚀 ABSOLUTE PRIORITY: CORS must be the first middleware to handle all preflights/errors
 app.use(cors({
   origin: true, // Dynamically reflect the incoming origin in development
@@ -32,13 +36,25 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Connect Database
+// ✅ SERVERLESS OPTIMIZATION: Cache DB connection to prevent pool exhaustion
+let isConnected = false;
 let gfs, gridfsBucket;
+
 const connectDB = async () => {
+  if (isConnected) {
+    logger.info('Using warm active database connection');
+    return;
+  }
+
   try {
     let mongoUri = process.env.MONGO_URI;
 
     if (!mongoUri) {
+      if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+        logger.error('CRITICAL: MONGO_URI is missing in production environment');
+        throw new Error('Database connection string required in production');
+      }
+      
       logger.warn('No MONGO_URI provided in .env');
       logger.info('Starting in-memory MongoDB Server for testing');
       const { MongoMemoryServer } = require('mongodb-memory-server');
@@ -49,7 +65,13 @@ const connectDB = async () => {
       logger.info('Using MongoDB URI from .env');
     }
 
-    const conn = await mongoose.connect(mongoUri);
+    // Connect with optimized Serverless pooling limits
+    const conn = await mongoose.connect(mongoUri, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000
+    });
+    
+    isConnected = !!conn.connections[0].readyState;
     logger.info('MongoDB Connected');
 
     // Init GridFS

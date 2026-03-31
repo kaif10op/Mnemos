@@ -48,7 +48,7 @@ router.post('/register', authLimiter, validate('register'), async (req, res) => 
 
     jwt.sign(
       payload,
-      process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex'),
+      process.env.JWT_SECRET || 'mnemos_secret_key_123',
       { expiresIn: '7d' },
       (err, token) => {
         if (err) throw err;
@@ -88,7 +88,7 @@ router.post('/login', authLimiter, validate('login'), async (req, res) => {
 
     jwt.sign(
       payload,
-      process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex'),
+      process.env.JWT_SECRET || 'mnemos_secret_key_123',
       { expiresIn: '7d' },
       (err, token) => {
         if (err) throw err;

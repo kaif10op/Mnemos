@@ -48,7 +48,7 @@ router.post('/:noteId', auth, async (req, res) => {
       return res.json({
         msg: 'Share already exists',
         token: share.token,
-        url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/shared.html?token=${share.token}`,
+        url: `${req.protocol}://${req.get('host')}/shared.html?token=${share.token}`,
         expiresAt: share.expiresAt
       });
     }
@@ -69,7 +69,7 @@ router.post('/:noteId', auth, async (req, res) => {
     res.json({
       msg: 'Share link created',
       token: share.token,
-      url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/shared.html?token=${share.token}`,
+      url: `${req.protocol}://${req.get('host')}/shared.html?token=${share.token}`,
       expiresAt: share.expiresAt
     });
   } catch (err) {
@@ -139,7 +139,7 @@ router.get('/shares/list', auth, async (req, res) => {
       token: s.token,
       noteId: s.noteId.clientId,
       noteTitle: s.noteId.title,
-      url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/shared.html?token=${s.token}`,
+      url: `${req.protocol}://${req.get('host')}/shared.html?token=${s.token}`,
       expiresAt: s.expiresAt,
       views: s.views,
       lastAccessedAt: s.lastAccessedAt,
