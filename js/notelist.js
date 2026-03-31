@@ -3,13 +3,21 @@
    ============================================ */
 
 (function () {
+  // Data fingerprint to detect actual changes and skip unnecessary renders
+  let _lastRenderFingerprint = '';
+
   window.NoteList = {
     init() {
       this._bindNewNote();
       this.render();
     },
 
-    render() {
+    /**
+     * Full re-render of the notes list.
+     * Uses fingerprinting to skip if data hasn't actually changed.
+     * @param {boolean} force - Skip fingerprint check and force render
+     */
+    render(force = false) {
       const container = document.getElementById('notes-container');
       const emptyState = document.getElementById('notelist-empty');
       const countEl = document.getElementById('notelist-count');
@@ -22,6 +30,18 @@
       const folderId = filter.type === 'folder' ? filter.id : '__all__';
       const notes = window.Store.getFilteredNotes({ folderId, tag, search });
 
+      // Build a fingerprint from note IDs, titles, tags, pins, and update times
+      const currentId = window.Editor.getCurrentId();
+      const fingerprint = notes.map(n =>
+        `${n.id}|${n.title}|${n.pinned}|${n.tags.join(',')}|${n.updatedAt}|${n.id === currentId}`
+      ).join('::') + `__count:${notes.length}`;
+
+      // Skip render if nothing meaningful changed
+      if (!force && fingerprint === _lastRenderFingerprint) {
+        return;
+      }
+      _lastRenderFingerprint = fingerprint;
+
       if (countEl) countEl.textContent = notes.length;
 
       if (notes.length === 0) {
@@ -32,8 +52,6 @@
 
       container.style.display = 'block';
       if (emptyState) emptyState.style.display = 'none';
-
-      const currentId = window.Editor.getCurrentId();
 
       // Use smooth renderer instead of full innerHTML replacement
       window.Renderer.smartRender(container, notes, (note, idx) => {
@@ -83,6 +101,75 @@
       window.AppIcons.render();
     },
 
+    /**
+     * Targeted update of a single note card in the DOM.
+     * Avoids full list re-render for minor changes (title, content preview, date).
+     */
+    updateCard(noteId) {
+      const container = document.getElementById('notes-container');
+      if (!container) return;
+
+      const card = container.querySelector(`[data-note-id="${noteId}"]`);
+      if (!card) {
+        // Card doesn't exist yet — need full render
+        this.render(true);
+        return;
+      }
+
+      const note = window.Store.getNote(noteId);
+      if (!note) return;
+
+      const currentId = window.Editor.getCurrentId();
+      const title = note.title || 'Untitled Note';
+      const preview = window.Store.stripHtml(note.content || '').substring(0, 100) || 'No content';
+      const date = window.Store.formatDate(note.updatedAt);
+      const tagDots = note.tags.slice(0, 4).map(t =>
+        `<span class="note-card-tag" style="background: ${window.Store.getTagColor(t)}" title="${t}"></span>`
+      ).join('');
+
+      // Update individual elements in-place (no flash, no transition)
+      const titleEl = card.querySelector('.note-card-title');
+      const previewEl = card.querySelector('.note-card-preview');
+      const dateEl = card.querySelector('.note-card-date');
+      const tagsEl = card.querySelector('.note-card-tags');
+
+      if (titleEl) titleEl.textContent = title;
+      if (previewEl) previewEl.textContent = preview;
+      if (dateEl) dateEl.textContent = date;
+      if (tagsEl) tagsEl.innerHTML = tagDots;
+
+      // Update active state
+      card.classList.toggle('active', note.id === currentId);
+
+      // Update pin indicator
+      const existingPin = card.querySelector('.note-card-pin');
+      if (note.pinned && !existingPin) {
+        const header = card.querySelector('.note-card-header');
+        if (header) {
+          const pin = document.createElement('span');
+          pin.className = 'note-card-pin';
+          pin.innerHTML = '<i class="ph-fill ph-push-pin" style="font-size:14px;fill:var(--accent-primary);"></i>';
+          header.appendChild(pin);
+        }
+      } else if (!note.pinned && existingPin) {
+        existingPin.remove();
+      }
+
+      // Update the count
+      const countEl = document.getElementById('notelist-count');
+      if (countEl) {
+        const filter = window.Sidebar.getFilter();
+        const tag = window.Sidebar.getActiveTag();
+        const search = window.SearchManager.getQuery();
+        const folderId = filter.type === 'folder' ? filter.id : '__all__';
+        const notes = window.Store.getFilteredNotes({ folderId, tag, search });
+        countEl.textContent = notes.length;
+      }
+
+      // Invalidate fingerprint so next full render detects previously-missed changes
+      _lastRenderFingerprint = '';
+    },
+
     _bindNewNote() {
       const btn = document.getElementById('new-note-btn');
       if (btn) {
@@ -101,7 +188,7 @@
       const filter = window.Sidebar.getFilter();
       const folderId = filter.type === 'folder' ? filter.id : null;
       const note = window.Store.createNote(folderId);
-      this.render();
+      this.render(true);
       window.Editor.open(note.id);
       window.Sidebar.renderFolders();
 

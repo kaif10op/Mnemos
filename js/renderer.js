@@ -84,36 +84,38 @@
             container.appendChild(newEl);
           }
 
-          // Trigger animation
+          // Trigger animation and clean up inline styles after
           if (transition) {
             setTimeout(() => {
               newEl.style.opacity = '1';
               newEl.style.transform = 'translateY(0)';
+              // Clean up inline styles after animation to avoid stale attrs
+              setTimeout(() => {
+                newEl.style.opacity = '';
+                newEl.style.transform = '';
+                newEl.style.transition = '';
+              }, 250);
             }, 10);
           }
         } else {
-          // Check if HTML changed
-          const oldHtml = existingEl.outerHTML;
-          if (oldHtml !== newHtml) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = newHtml.trim();
-            const newEl = tempDiv.firstElementChild;
-            newEl.dataset.renderKey = key;
+          // Check if HTML changed — compare normalized content
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = newHtml.trim();
+          const newEl = tempDiv.firstElementChild;
+          newEl.dataset.renderKey = key;
 
-            if (transition) {
-              existingEl.style.transition = 'opacity 150ms ease';
-              existingEl.style.opacity = '0.5';
+          // Normalize: strip inline transition/animation styles for comparison
+          const normalizeHtml = (el) => {
+            const clone = el.cloneNode(true);
+            clone.style.opacity = '';
+            clone.style.transform = '';
+            clone.style.transition = '';
+            return clone.outerHTML;
+          };
 
-              setTimeout(() => {
-                container.replaceChild(newEl, existingEl);
-                setTimeout(() => {
-                  newEl.style.opacity = '1';
-                  newEl.style.transition = 'opacity 150ms ease';
-                }, 10);
-              }, 150);
-            } else {
-              container.replaceChild(newEl, existingEl);
-            }
+          if (normalizeHtml(existingEl) !== normalizeHtml(newEl)) {
+            // Direct replacement — NO opacity transition to avoid flicker
+            container.replaceChild(newEl, existingEl);
           } else {
             // Move element to correct position if needed
             if (container.children[currentIndex] !== existingEl) {

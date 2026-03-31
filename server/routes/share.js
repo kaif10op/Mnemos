@@ -10,13 +10,35 @@ const Share = require('../models/Share');
 router.post('/:noteId', auth, async (req, res) => {
   const userId = req.user.id;
   const { noteId } = req.params;
-  const { expiresIn } = req.body; // Optional: 7d, 30d, etc.
+  const { expiresIn, title, content, tags } = req.body; // Accept note data for auto-create
 
   try {
+    console.log('[SHARE] POST request:', { userId, noteId, bodyKeys: Object.keys(req.body), title: typeof title, content: typeof content });
+
     // Verify the note belongs to the user
-    const note = await Note.findOne({ userId, clientId: noteId });
+    let note = await Note.findOne({ userId, clientId: noteId });
+    console.log('[SHARE] Note found in DB:', !!note);
+
+    // If note not in DB yet (not synced), create it on the fly
+    if (!note && (title !== undefined || content !== undefined)) {
+      console.log('[SHARE] Auto-creating note in DB...');
+      note = new Note({
+        userId,
+        clientId: noteId,
+        title: title || '',
+        content: content || '',
+        tags: tags || [],
+        folderId: null,
+        pinned: false,
+        clientUpdatedAt: new Date(),
+      });
+      await note.save();
+      console.log('[SHARE] Note created successfully:', note._id);
+    }
+
     if (!note) {
-      return res.status(404).json({ msg: 'Note not found' });
+      console.log('[SHARE] Note not found and no body data to create it');
+      return res.status(404).json({ msg: 'Note not found. Please sync your notes first.' });
     }
 
     // Check if share already exists
@@ -26,7 +48,7 @@ router.post('/:noteId', auth, async (req, res) => {
       return res.json({
         msg: 'Share already exists',
         token: share.token,
-        url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/shared/${share.token}`,
+        url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/shared.html?token=${share.token}`,
         expiresAt: share.expiresAt
       });
     }
@@ -47,7 +69,7 @@ router.post('/:noteId', auth, async (req, res) => {
     res.json({
       msg: 'Share link created',
       token: share.token,
-      url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/shared/${share.token}`,
+      url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/shared.html?token=${share.token}`,
       expiresAt: share.expiresAt
     });
   } catch (err) {
@@ -117,7 +139,7 @@ router.get('/shares/list', auth, async (req, res) => {
       token: s.token,
       noteId: s.noteId.clientId,
       noteTitle: s.noteId.title,
-      url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/shared/${s.token}`,
+      url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/shared.html?token=${s.token}`,
       expiresAt: s.expiresAt,
       views: s.views,
       lastAccessedAt: s.lastAccessedAt,

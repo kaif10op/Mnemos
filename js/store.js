@@ -253,6 +253,11 @@ async function fetchFromCloud() {
   if (!token) return;
 
   try {
+    // Capture current state fingerprint for comparison
+    const beforeNotes = getAllNotes();
+    const beforeFolders = getAllFolders();
+    const beforeFingerprint = _buildDataFingerprint(beforeNotes, beforeFolders);
+
     // ✅ Use retry logic for resilience
     const res = await window.ErrorHandler.retryWithBackoff(
       () => window.ErrorHandler.fetchWithRetry(`${window.API_BASE_URL}/sync`, {
@@ -312,14 +317,17 @@ async function fetchFromCloud() {
       return; // UI will be refreshed by syncWithCloud
     }
 
-    // Load cloud data into local storage (source of truth)
-    saveAllNotes(notes);
-    saveAllFolders(folders);
+    // ✅ SILENT: Write to localStorage directly (skip triggering another sync)
+    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
+    localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(folders));
 
-    // Refresh UI
-    window.Sidebar.renderFolders();
-    window.Sidebar.renderTags();
-    window.NoteList.render();
+    // Only re-render UI if data actually changed
+    const afterFingerprint = _buildDataFingerprint(notes, folders);
+    if (afterFingerprint !== beforeFingerprint) {
+      window.Sidebar.renderFolders();
+      window.Sidebar.renderTags();
+      window.NoteList.render(true);
+    }
   } catch (err) {
     window.ErrorHandler.handleNetworkError(err, 'Cloud Fetch');
   }
@@ -357,16 +365,14 @@ async function syncWithCloud() {
 
     const data = await res.json();
 
-    // Merge back cloud data (server is source of truth)
-    saveAllNotes(data.notes || []);
-    saveAllFolders(data.folders || []);
-
-    // Refresh UI
-    window.Sidebar.renderFolders();
-    window.Sidebar.renderTags();
-    window.NoteList.render();
+    // ✅ SILENT: Write to localStorage directly without triggering re-renders or re-sync
+    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(data.notes || []));
+    localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(data.folders || []));
 
     if (statusEl) statusEl.textContent = 'Saved & Synced';
+    setTimeout(() => {
+      if (statusEl) statusEl.textContent = '';
+    }, 3000);
   } catch (err) {
     const errorInfo = window.ErrorHandler.handleNetworkError(err, 'Cloud Sync');
     if (statusEl) {
@@ -447,5 +453,13 @@ window.Store = {
   initSync, syncWithCloud, scheduleSync, fetchFromCloud,
   exportData, importData,
   stripHtml, formatDate, generateId,
-  loadMoreNotes, // ✅ NEW: Pagination support
+  loadMoreNotes, // ✅ Pagination support
 };
+
+/* ── Data Fingerprint Helper ── */
+
+function _buildDataFingerprint(notes, folders) {
+  const notesPart = notes.map(n => `${n.id}:${n.updatedAt}`).sort().join(',');
+  const foldersPart = folders.map(f => `${f.id}:${f.name}`).sort().join(',');
+  return `N[${notesPart}]F[${foldersPart}]`;
+}

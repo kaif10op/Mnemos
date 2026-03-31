@@ -196,19 +196,33 @@
   </div>
 
   <script>
-    // Get share token from URL
-    const token = window.location.pathname.split('/').pop();
+    // Get share token from URL query params (?token=xxx)
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
     const API_BASE_URL = localStorage.getItem('notesaver_api_base_url') || 'http://localhost:5050/api';
 
     async function loadSharedNote() {
+      // Validate token exists
+      if (!token) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'flex';
+        document.getElementById('error-title').textContent = 'Invalid Link';
+        document.getElementById('error-message').textContent = 'This share link is missing a token. Please check the URL and try again.';
+        return;
+      }
+
       try {
         const res = await fetch(`${API_BASE_URL}/share/${token}`);
 
         if (!res.ok) {
-          throw new Error('Note not found or expired');
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.msg || 'Note not found or expired');
         }
 
         const note = await res.json();
+
+        // Update page title
+        document.title = `${note.title || 'Shared Note'} — Mnemos`;
 
         // Sanitize and display content
         const titleEl = document.getElementById('note-title');
@@ -250,6 +264,8 @@
               </span>
             `;
           }).join('');
+        } else {
+          tagsEl.style.display = 'none';
         }
 
         document.getElementById('loading').style.display = 'none';

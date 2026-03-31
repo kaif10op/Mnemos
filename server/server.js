@@ -53,10 +53,20 @@ const connectDB = async () => {
 };
 connectDB();
 
+const path = require('path');
+
 // Define Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/sync', require('./routes/sync'));
-app.use('/api/share', require('./routes/share')); // ✅ NEW: Sharing endpoints
+app.use('/api/share', require('./routes/share')); // ✅ Sharing endpoints
+
+// ✅ Serve frontend static files
+app.use(express.static(path.join(__dirname, '..')));
+
+// ✅ Redirect old /shared/:token path-based URLs to query-param format
+app.get('/shared/:token', (req, res) => {
+  res.redirect(`/shared.html?token=${req.params.token}`);
+});
 
 // ✅ LOGGING: Error handling middleware
 app.use((err, req, res, next) => {
