@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Notes Saver — A beautiful, professional note-taking application with rich text editing, folders, tags, and more. All data stored locally." />
+  <meta name="theme-color" content="#0f0f14" />
+  <title>Notes Saver — Your Personal Note-Taking Space</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/animations.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/notelist.css" />
+  <link rel="stylesheet" href="css/editor.css" />
+</head>
+<body>
+
+  <!-- Mobile Menu Button -->
+  <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle sidebar">☰</button>
+
+  <!-- Sidebar Overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ==================== APP ==================== -->
+  <div id="app">
+
+    <!-- ══════ SIDEBAR ══════ -->
+    <aside class="sidebar" role="navigation" aria-label="Note categories">
+
+      <!-- Brand -->
+      <div class="sidebar-header">
+        <div class="sidebar-logo">📝</div>
+        <div class="sidebar-brand">
+          <h1>Notes Saver</h1>
+          <span>Your notes, your space</span>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div class="sidebar-search">
+        <div class="search-wrapper">
+          <span class="search-icon">🔍</span>
+          <input
+            type="text"
+            id="search-input"
+            class="search-input"
+            placeholder="Search notes..."
+            autocomplete="off"
+          />
+          <button class="search-clear" id="search-clear" aria-label="Clear search">✕</button>
+        </div>
+      </div>
+
+      <!-- Scrollable Content -->
+      <div class="sidebar-content">
+
+        <!-- Folders Section -->
+        <div class="sidebar-section">
+          <div class="section-header">
+            <span class="section-title">Folders</span>
+            <button class="section-action" id="add-folder-btn" title="New folder">+</button>
+          </div>
+          <div id="folders-list"></div>
+        </div>
+
+        <!-- Tags Section -->
+        <div class="sidebar-section">
+          <div class="section-header">
+            <span class="section-title">Tags</span>
+          </div>
+          <div class="tags-cloud" id="tags-cloud"></div>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="sidebar-footer">
+        <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
+          <div class="theme-toggle-knob">🌙</div>
+        </button>
+        <div class="sidebar-footer-actions">
+          <button class="sidebar-footer-btn" id="import-btn" title="Import notes">📤</button>
+          <button class="sidebar-footer-btn" id="export-btn" title="Export notes">📥</button>
+          <button class="sidebar-footer-btn" id="shortcuts-btn" title="Keyboard shortcuts" onclick="window.ShortcutManager._showShortcutsModal()">⌨️</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ══════ NOTE LIST ══════ -->
+    <section class="notelist" aria-label="Notes list">
+
+      <!-- Header -->
+      <div class="notelist-header">
+        <div>
+          <span class="notelist-title">All Notes</span>
+          <span class="notelist-count" id="notelist-count">0</span>
+        </div>
+        <button class="new-note-btn" id="new-note-btn" title="New note (Ctrl+N)">+</button>
+      </div>
+
+      <!-- Sort Bar -->
+      <div class="notelist-sort">
+        <button class="sort-btn active" data-sort="updated">Recent</button>
+        <button class="sort-btn" data-sort="title">A–Z</button>
+        <button class="sort-btn" data-sort="created">Created</button>
+      </div>
+
+      <!-- Note Cards -->
+      <div class="notelist-cards" id="notes-container"></div>
+
+      <!-- Empty State -->
+      <div class="notelist-empty" id="notelist-empty" style="display: none;">
+        <div class="notelist-empty-icon">📄</div>
+        <h3>No notes yet</h3>
+        <p>Create your first note to get started</p>
+      </div>
+
+    </section>
+
+    <!-- ══════ EDITOR ══════ -->
+    <main class="editor-panel" role="main">
+
+      <!-- Empty Editor State -->
+      <div class="editor-empty" id="editor-empty-state">
+        <div class="editor-empty-icon">✏️</div>
+        <h2>Select a note to start editing</h2>
+        <p>Choose a note from the list or create a new one</p>
+        <div class="editor-empty-shortcuts">
+          <div class="shortcut-hint">
+            <kbd class="kbd">Ctrl+N</kbd>
+            <span>New note</span>
+          </div>
+          <div class="shortcut-hint">
+            <kbd class="kbd">Ctrl+F</kbd>
+            <span>Search</span>
+          </div>
+          <div class="shortcut-hint">
+            <kbd class="kbd">Ctrl+/</kbd>
+            <span>All shortcuts</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Editor (hidden initially) -->
+      <div id="editor-active" style="display: none; flex-direction: column; height: 100%;">
+
+        <!-- Editor Header -->
+        <div class="editor-header">
+          <div class="editor-header-left">
+            <button class="mobile-back-btn" id="mobile-back-btn" aria-label="Back to list">←</button>
+          </div>
+          <div class="editor-header-actions">
+            <button class="editor-action-btn" id="pin-btn" title="Pin note">📍</button>
+            <button class="editor-action-btn" id="delete-note-btn" title="Delete note">🗑️</button>
+          </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="editor-toolbar" role="toolbar" aria-label="Formatting options">
+          <select class="toolbar-select" id="heading-select" title="Heading level">
+            <option value="">Heading</option>
+            <option value="h1">Heading 1</option>
+            <option value="h2">Heading 2</option>
+            <option value="h3">Heading 3</option>
+            <option value="p">Paragraph</option>
+          </select>
+          <div class="toolbar-divider"></div>
+          <button class="toolbar-btn" data-command="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button class="toolbar-btn" data-command="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button class="toolbar-btn" data-command="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button class="toolbar-btn" data-command="strikeThrough" title="Strikethrough"><s>S</s></button>
+          <div class="toolbar-divider"></div>
+          <button class="toolbar-btn" data-command="insertUnorderedList" title="Bullet list">•≡</button>
+          <button class="toolbar-btn" data-command="insertOrderedList" title="Numbered list">1.</button>
+          <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Quote">❝</button>
+          <button class="toolbar-btn" data-command="formatBlock" data-value="pre" title="Code block">&lt;/&gt;</button>
+          <div class="toolbar-divider"></div>
+          <button class="toolbar-btn" data-command="createLink" title="Insert link">🔗</button>
+          <button class="toolbar-btn" data-command="insertHorizontalRule" title="Horizontal rule">—</button>
+          <button class="toolbar-btn" data-command="removeFormat" title="Clear formatting">🧹</button>
+        </div>
+
+        <!-- Title -->
+        <div class="editor-title-wrapper">
+          <input
+            type="text"
+            id="editor-title"
+            class="editor-title"
+            placeholder="Note title..."
+            autocomplete="off"
+          />
+        </div>
+
+        <!-- Tags -->
+        <div class="editor-tags-wrapper">
+          <div id="editor-tags"></div>
+          <input
+            type="text"
+            id="tag-input"
+            class="tag-input"
+            placeholder="Add tag..."
+            autocomplete="off"
+          />
+        </div>
+
+        <!-- Content -->
+        <div class="editor-body-wrapper">
+          <div
+            id="editor-body"
+            class="editor-body"
+            contenteditable="true"
+            spellcheck="true"
+            role="textbox"
+            aria-multiline="true"
+            aria-label="Note content"
+          ></div>
+        </div>
+
+        <!-- Footer -->
+        <div class="editor-footer">
+          <div class="editor-stats">
+            <span id="word-count">0 words</span>
+            <span id="char-count">0 chars</span>
+          </div>
+          <div class="editor-save-status">
+            <span class="save-dot"></span>
+            <span id="save-status-label">Saved</span>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ══════ TOAST CONTAINER ══════ -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ══════ MODAL ══════ -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="modal"></div>
+  </div>
+
+  <!-- Scripts (order matters) -->
+  <script src="js/store.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/sidebar.js"></script>
+  <script src="js/notelist.js"></script>
+  <script src="js/shortcuts.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,160 @@
+/* ============================================
+   ANIMATIONS — Keyframes & Micro-interactions
+   ============================================ */
+
+/* ── Fade In ── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Fade In Up ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Fade In Down ── */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Slide In Left ── */
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ── Slide In Right ── */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ── Scale In ── */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ── Pulse ── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+
+/* ── Save Flash ── */
+@keyframes saveFlash {
+  0%   { box-shadow: 0 0 0 0 var(--shadow-glow); }
+  50%  { box-shadow: 0 0 24px 8px var(--shadow-glow); }
+  100% { box-shadow: 0 0 0 0 var(--shadow-glow); }
+}
+
+/* ── Spin ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Shake ── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-4px); }
+  40%      { transform: translateX(4px); }
+  60%      { transform: translateX(-3px); }
+  80%      { transform: translateX(3px); }
+}
+
+/* ── Bounce In ── */
+@keyframes bounceIn {
+  0%   { transform: scale(0.3); opacity: 0; }
+  50%  { transform: scale(1.05); }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Toast Slide ── */
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes toastSlideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%) scale(0.9);
+  }
+}
+
+/* ── Shimmer loading ── */
+@keyframes shimmer {
+  0%   { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+
+/* ── Utility Classes ── */
+.animate-fade-in       { animation: fadeIn var(--transition-base) both; }
+.animate-fade-in-up    { animation: fadeInUp var(--transition-slow) both; }
+.animate-fade-in-down  { animation: fadeInDown var(--transition-slow) both; }
+.animate-slide-left    { animation: slideInLeft var(--transition-slow) both; }
+.animate-slide-right   { animation: slideInRight var(--transition-slow) both; }
+.animate-scale-in      { animation: scaleIn var(--transition-base) both; }
+.animate-bounce-in     { animation: bounceIn 500ms both; }
+.animate-save-flash    { animation: saveFlash 600ms ease; }
+
+/* ── Staggered note card entrance ── */
+.note-card:nth-child(1)  { animation-delay: 0ms; }
+.note-card:nth-child(2)  { animation-delay: 30ms; }
+.note-card:nth-child(3)  { animation-delay: 60ms; }
+.note-card:nth-child(4)  { animation-delay: 90ms; }
+.note-card:nth-child(5)  { animation-delay: 120ms; }
+.note-card:nth-child(6)  { animation-delay: 150ms; }
+.note-card:nth-child(7)  { animation-delay: 180ms; }
+.note-card:nth-child(8)  { animation-delay: 210ms; }
+.note-card:nth-child(9)  { animation-delay: 240ms; }
+.note-card:nth-child(10) { animation-delay: 270ms; }
+
+/* ── Theme transition overlay ── */
+.theme-transitioning * {
+  transition-duration: 0ms !important;
+}

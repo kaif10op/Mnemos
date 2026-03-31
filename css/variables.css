@@ -1,0 +1,135 @@
+/* ============================================
+   DESIGN TOKENS — Notes Saver
+   ============================================ */
+
+:root {
+  /* ── Color Palette (Dark Theme) ── */
+  --bg-primary: #06060c;
+  --bg-secondary: rgba(20, 20, 30, 0.35);
+  --bg-tertiary: rgba(30, 30, 45, 0.25);
+  --bg-elevated: rgba(40, 40, 60, 0.75);
+  --bg-glass: rgba(20, 20, 35, 0.45);
+  --bg-glass-hover: rgba(50, 40, 75, 0.4);
+  --bg-glass-active: rgba(70, 50, 100, 0.5);
+
+  --text-primary: #f8f9fa;
+  --text-secondary: #aeb5c0;
+  --text-tertiary: #6c7689;
+  --text-inverse: #06060c;
+
+  --accent-primary: #bc28e9;
+  --accent-primary-hover: #d253f5;
+  --accent-primary-glow: rgba(188, 40, 233, 0.45);
+  --accent-secondary: #0df0e3;
+  --accent-tertiary: #ff2a7a;
+  --accent-warning: #ffb84d;
+  --accent-danger: #ff4757;
+  --accent-success: #2ed573;
+
+  --border-default: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  --border-active: rgba(188, 40, 233, 0.5);
+  --border-focus: rgba(188, 40, 233, 0.7);
+
+  /* ── Spacing Scale ── */
+  --space-2xs: 4px;
+  --space-xs: 6px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+  --space-3xl: 32px;
+  --space-4xl: 40px;
+  --space-5xl: 48px;
+
+  /* ── Typography ── */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  --font-size-xs: 0.6875rem;    /* 11px */
+  --font-size-sm: 0.75rem;      /* 12px */
+  --font-size-base: 0.875rem;   /* 14px */
+  --font-size-md: 1rem;         /* 16px */
+  --font-size-lg: 1.125rem;     /* 18px */
+  --font-size-xl: 1.5rem;       /* 24px */
+  --font-size-2xl: 2rem;        /* 32px */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-base: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ── Border Radius ── */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 24px var(--accent-primary-glow);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+
+  /* ── Glassmorphism ── */
+  --glass-blur: 24px;
+  --glass-border: 1px solid var(--border-default);
+
+  /* ── Transitions ── */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── Layout ── */
+  --sidebar-width: 260px;
+  --notelist-width: 320px;
+  --toolbar-height: 52px;
+  --scrollbar-width: 6px;
+
+  /* ── Z-Index ── */
+  --z-sidebar: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+  --z-tooltip: 500;
+}
+
+/* ── Light Theme Overrides ── */
+[data-theme="light"] {
+  --bg-primary: #f6f7fa;
+  --bg-secondary: rgba(255, 255, 255, 0.6);
+  --bg-tertiary: rgba(240, 242, 246, 0.5);
+  --bg-elevated: rgba(255, 255, 255, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.5);
+  --bg-glass-hover: rgba(255, 255, 255, 0.75);
+  --bg-glass-active: rgba(255, 255, 255, 0.9);
+
+  --text-primary: #12141a;
+  --text-secondary: #5f6776;
+  --text-tertiary: #8f99a8;
+  --text-inverse: #ffffff;
+
+  --accent-primary: #8a2be2;
+  --accent-primary-hover: #7b1cd1;
+  --accent-primary-glow: rgba(138, 43, 226, 0.25);
+
+  --border-default: rgba(0, 0, 0, 0.06);
+  --border-hover: rgba(0, 0, 0, 0.12);
+  --border-active: rgba(138, 43, 226, 0.35);
+  --border-focus: rgba(138, 43, 226, 0.5);
+
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.15);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(0, 0, 0, 0.02);
+}
