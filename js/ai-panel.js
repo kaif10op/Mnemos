@@ -222,34 +222,84 @@
         const token = window.Auth.getToken();
         const endpoint = contextMode === 'note' ? '/ai/agent' : '/ai/complete';
         
+        // 60 second timeout to prevent infinite hang
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        
         const res = await fetch(`${window.API_BASE_URL}${endpoint}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ prompt: query, context: context.substring(0, 15000) })
+          body: JSON.stringify({ prompt: query, context: context.substring(0, 15000) }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
 
         if (!res.ok) throw new Error('AI failed to respond');
         const data = await res.json();
         
-        if (contextMode === 'note' && data.agent) {
-           const payload = data.agent;
-           if (payload.action === 'CHAT') {
-               this._replaceLoadingWithMessage(loadingId, payload.text || 'No response.');
-               if (useVoiceOutput) this._speak(payload.text);
+        if (contextMode === 'note' && data.agent && data.agent.actions) {
+           const actions = data.agent.actions;
+           
+           // Separate CHAT actions from execution actions
+           const chatActions = actions.filter(a => a.action === 'CHAT');
+           const execActions = actions.filter(a => a.action !== 'CHAT');
+           
+           if (execActions.length === 0 && chatActions.length > 0) {
+              // Pure conversation
+              const chatText = chatActions.map(a => a.text).join('\n\n');
+              this._replaceLoadingWithMessage(loadingId, chatText || 'No response.');
+              if (useVoiceOutput) this._speak(chatText);
            } else {
-               this._executeAgentAction(payload);
-               this._replaceLoadingWithMessage(loadingId, `✨ Automated Task: **${payload.action}**\n\nI have successfully updated your workspace!`);
-               if (useVoiceOutput) this._speak(`Alright, I've successfully completed the ${payload.action.replace(/_/g, ' ')} task for you.`);
+              // Execute all actions sequentially with stagger
+              const totalOps = execActions.length;
+              let completed = 0;
+              
+              execActions.forEach((actionPayload, i) => {
+                 setTimeout(() => {
+                    try {
+                       this._executeAgentAction(actionPayload);
+                       completed++;
+                    } catch(e) {
+                       console.warn(`[Agent] Action ${i} (${actionPayload.action}) failed:`, e);
+                    }
+                    
+                    // After all completed — refresh UI and report
+                    if (completed >= totalOps) {
+                       window.NoteList.render(true);
+                       if (window.Sidebar) {
+                          window.Sidebar.renderFolders();
+                          window.Sidebar.renderTags();
+                       }
+                    }
+                 }, i * 250); // 250ms stagger between operations
+              });
+              
+              // Build summary
+              const actionNames = execActions.map(a => a.action.replace(/_/g, ' ')).join(', ');
+              const summaryMsg = totalOps === 1
+                 ? `✨ **${execActions[0].action}** completed!`
+                 : `✨ **${totalOps} actions** executed: ${actionNames}`;
+              
+              // Include any CHAT text too
+              const chatText = chatActions.map(a => a.text).join('\n\n');
+              this._replaceLoadingWithMessage(loadingId, chatText ? `${summaryMsg}\n\n${chatText}` : summaryMsg);
+              if (useVoiceOutput) this._speak(`Done! I completed ${totalOps} task${totalOps > 1 ? 's' : ''}.`);
            }
-        } else {
+        } else if (data.result) {
            this._replaceLoadingWithMessage(loadingId, data.result || 'No response generated.');
            if (useVoiceOutput) this._speak(data.result);
+        } else {
+           this._replaceLoadingWithMessage(loadingId, '⚠️ No actionable response from AI.');
         }
       } catch (err) {
-        this._replaceLoadingWithMessage(loadingId, `⚠️ Error: ${err.message}`);
+        const errorMsg = err.name === 'AbortError' 
+          ? '⚠️ Request timed out (60s). Try a simpler prompt or check your LLM API keys.'
+          : `⚠️ Error: ${err.message}`;
+        this._replaceLoadingWithMessage(loadingId, errorMsg);
       } finally {
         isWaiting = false;
       }
@@ -477,6 +527,187 @@
              window.showToast('🤖 Mermaid diagram generated', 'success');
           } else {
              window.showToast('🤖 No diagram content generated', 'warning');
+          }
+          return;
+       }
+
+       // ── Workspace Search & Navigation Tools ──
+       if (action === 'SEARCH_NOTES') {
+          const query = payload.searchQuery || text || '';
+          if (query) {
+             // Set the search input and trigger re-render
+             const searchInput = document.getElementById('search-input');
+             if (searchInput) {
+                searchInput.value = query;
+                window.SearchManager.query = query;
+                window.NoteList.render(true);
+                window.showToast(`🤖 Searching for: "${query}"`, 'success');
+             }
+          } else {
+             window.showToast('🤖 No search query specified', 'warning');
+          }
+          return;
+       }
+
+       if (action === 'OPEN_NOTE') {
+          const query = (payload.searchQuery || text || '').toLowerCase();
+          if (query) {
+             const allNotes = window.Store.getAllNotes();
+             // Find best match by title, then by content
+             const match = allNotes.find(n => (n.title || '').toLowerCase().includes(query))
+                || allNotes.find(n => window.Store.stripHtml(n.content || '').toLowerCase().includes(query));
+             if (match) {
+                window.Editor.open(match.id);
+                window.NoteList.render();
+                window.showToast(`🤖 Opened: "${match.title || 'Untitled'}"`, 'success');
+             } else {
+                window.showToast(`🤖 No note found matching "${query}"`, 'warning');
+             }
+          }
+          return;
+       }
+
+       if (action === 'LIST_NOTES') {
+          const folderName = payload.folderName;
+          let notes = window.Store.getAllNotes();
+          let label = 'all notes';
+          
+          if (folderName) {
+             const allFolders = window.Store.getAllFolders();
+             const folder = allFolders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
+             if (folder) {
+                notes = notes.filter(n => n.folderId === folder.id);
+                label = `notes in "${folder.name}"`;
+             }
+          }
+          
+          // Build a summary for the chat
+          if (notes.length === 0) {
+             this._appendMessage('ai', `📋 No ${label} found.`);
+          } else {
+             const listHtml = notes.map((n, i) => 
+                `<b>${i + 1}.</b> ${n.title || 'Untitled'} <span style="color:var(--text-tertiary);font-size:12px;">(${(n.tags || []).join(', ') || 'no tags'})</span>`
+             ).join('<br>');
+             this._appendMessage('ai', `📋 <b>${notes.length} ${label}:</b><br>${listHtml}`);
+          }
+          window.showToast(`🤖 Listed ${notes.length} ${label}`, 'info');
+          return;
+       }
+
+       if (action === 'FILTER_BY_TAG') {
+          const tagName = (tags || payload.searchQuery || '').trim().toLowerCase().replace(/^#/, '');
+          if (tagName) {
+             // Click the tag in sidebar to filter
+             const tagEls = document.querySelectorAll('.tag-item');
+             let found = false;
+             tagEls.forEach(el => {
+                if ((el.textContent || '').toLowerCase().trim().replace(/^#/, '') === tagName) {
+                   el.click();
+                   found = true;
+                }
+             });
+             if (!found) {
+                // Manual filter via search
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) {
+                   searchInput.value = tagName;
+                   window.SearchManager.query = tagName;
+                   window.NoteList.render(true);
+                }
+             }
+             window.showToast(`🤖 Filtered by tag: ${tagName}`, 'success');
+          }
+          return;
+       }
+
+       if (action === 'SORT_NOTES') {
+          const criterion = (payload.searchQuery || text || 'newest').toLowerCase();
+          let notes = window.Store.getAllNotes();
+          
+          if (criterion.includes('oldest') || criterion.includes('old')) {
+             notes.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          } else if (criterion.includes('alpha') || criterion.includes('a-z') || criterion.includes('name')) {
+             notes.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+          } else if (criterion.includes('content') || criterion.includes('length') || criterion.includes('longest')) {
+             notes.sort((a, b) => (b.content || '').length - (a.content || '').length);
+          } else {
+             // Default: newest first
+             notes.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+          }
+          
+          window.Store.saveAllNotes(notes);
+          window.NoteList.render(true);
+          window.showToast(`🤖 Notes sorted: ${criterion}`, 'success');
+          return;
+       }
+
+       if (action === 'CREATE_RICH_NOTE') {
+          // Same as CREATE_NOTE but the AI was instructed to go all-out
+          let folderId = null;
+          const folderName = payload.folderName;
+          if (folderName) {
+             const allFolders = window.Store.getAllFolders();
+             const existing = allFolders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
+             if (existing) {
+                folderId = existing.id;
+             } else {
+                const newFolder = window.Store.createFolder(folderName);
+                folderId = newFolder.id;
+                window.Sidebar.renderFolders();
+             }
+          }
+          const newNote = window.Store.createNote(folderId);
+          if (newNote) {
+             const cleanHtml = this._sanitizeAgentHtml(text || '');
+             window.Store.updateNote(newNote.id, { 
+                title: title || '📚 Rich AI Document', 
+                content: cleanHtml,
+                tags: tags ? tags.split(',').map(t => t.trim()) : ['ai-generated']
+             });
+             window.Editor.open(newNote.id);
+             window.NoteList.render();
+             window.showToast('🤖 Rich document created!', 'success');
+          }
+          return;
+       }
+
+       if (action === 'FIND_AND_UPDATE') {
+          const query = (payload.searchQuery || '').toLowerCase();
+          if (query) {
+             const allNotes = window.Store.getAllNotes();
+             const match = allNotes.find(n => (n.title || '').toLowerCase().includes(query))
+                || allNotes.find(n => window.Store.stripHtml(n.content || '').toLowerCase().includes(query));
+             
+             if (match) {
+                // Open the note first
+                window.Editor.open(match.id);
+                window.NoteList.render();
+                
+                // Apply updates
+                const updates = {};
+                if (title) updates.title = title;
+                if (text) {
+                   // Append the new content to existing
+                   const existingContent = match.content || '';
+                   updates.content = existingContent + '<br><br>' + this._sanitizeAgentHtml(text);
+                }
+                window.Store.updateNote(match.id, updates);
+                
+                // Refresh the open editor with new content
+                const editorBody = document.getElementById('editor-body');
+                if (editorBody && updates.content) {
+                   editorBody.innerHTML = updates.content;
+                }
+                const editorTitle = document.getElementById('editor-title');
+                if (editorTitle && updates.title) {
+                   editorTitle.value = updates.title;
+                }
+                
+                window.Editor._scheduleAutoSave();
+                window.showToast(`🤖 Updated note: "${match.title}"`, 'success');
+             } else {
+                window.showToast(`🤖 No note found matching "${query}"`, 'warning');
+             }
           }
           return;
        }
