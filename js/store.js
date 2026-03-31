@@ -392,13 +392,54 @@ function formatDate(iso) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+/* ── Pagination ── */
+
+let currentPage = 1;
+let totalPages = 1;
+let hasMore = false;
+const NOTES_PER_PAGE = 50;
+
+async function loadMoreNotes() {
+  const token = Auth.getToken();
+  if (!token || !hasMore) return;
+
+  currentPage++;
+
+  try {
+    const res = await window.ErrorHandler.fetchWithRetry(`${window.API_BASE_URL}/sync?page=${currentPage}&limit=${NOTES_PER_PAGE}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    const data = await res.json();
+    const notes = getAllNotes();
+
+    // Append new notes
+    const newNotes = data.notes.filter(n => !notes.some(existing => existing.id === n.id));
+    notes.push(...newNotes);
+    saveAllNotes(notes);
+
+    // Update pagination state
+    hasMore = data.pagination.hasMore;
+    totalPages = data.pagination.pages;
+
+    // Refresh UI
+    window.NoteList.render();
+    return { success: true, hasMore, loaded: newNotes.length };
+  } catch (err) {
+    console.error('Load more error:', err);
+    return { success: false, hasMore: false };
+  }
+}
+
 // Make store functions global
 window.Store = {
   getAllNotes, saveAllNotes, createNote, getNote, updateNote, deleteNote,
   togglePin, getFilteredNotes, getAllTags, getTagColor,
   getAllFolders, saveAllFolders, createFolder, updateFolder, deleteFolder, getNotesCountByFolder,
   getSettings, saveSetting,
-  initSync, syncWithCloud, scheduleSync,
+  initSync, syncWithCloud, scheduleSync, fetchFromCloud,
   exportData, importData,
   stripHtml, formatDate, generateId,
+  loadMoreNotes, // ✅ NEW: Pagination support
 };

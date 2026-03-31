@@ -6,14 +6,23 @@ const Folder = require('../models/Folder');
 const cache = require('../utils/cache');
 
 // @route   GET api/sync
-// @desc    Fetch user's notes and folders from cloud (excludes deleted)
+// @desc    Fetch user's notes and folders from cloud (with pagination)
 // @access  Private
 router.get('/', auth, async (req, res) => {
   const userId = req.user.id;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, parseInt(req.query.limit) || 50); // Max 100 per page
+  const skip = (page - 1) * limit;
 
   try {
-    // ✅ FEATURE: Only fetch active notes (not in trash)
-    const allNotes = await Note.find({ userId }).active();
+    // ✅ FEATURE: Pagination with lazy loading
+    const allNotes = await Note.find({ userId })
+      .active()
+      .sort({ pinned: -1, updatedAt: -1 }) // Pinned first, then by date
+      .skip(skip)
+      .limit(limit);
+
+    const totalNotes = await Note.countDocuments({ userId, deletedAt: null });
     const allFolders = await Folder.find({ userId });
 
     // Map back to client format
@@ -33,7 +42,17 @@ router.get('/', auth, async (req, res) => {
       icon: f.icon
     }));
 
-    res.json({ notes: cloudNotes, folders: cloudFolders });
+    res.json({
+      notes: cloudNotes,
+      folders: cloudFolders,
+      pagination: {
+        page,
+        limit,
+        total: totalNotes,
+        pages: Math.ceil(totalNotes / limit),
+        hasMore: page < Math.ceil(totalNotes / limit)
+      }
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ msg: 'Server Error' });
