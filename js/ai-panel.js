@@ -5,6 +5,7 @@
 (function () {
   let isAiOpen = false;
   let isWaiting = false;
+  let useVoiceOutput = false;
 
   window.AIPanel = {
     init() {
@@ -69,7 +70,13 @@
             <button class="ai-action-chip" data-action="mindmap">Mind Map</button>
           </div>
 
-          <form class="ai-input-area" id="ai-form">
+          <form class="ai-input-area" id="ai-form" style="display:flex; gap:8px;">
+            <button type="button" id="ai-voice-btn" class="ai-send-btn" title="Voice Dictation" style="background:transparent; color:var(--text-secondary);">
+              <i class="ph-bold ph-microphone" style="font-size:18px;"></i>
+            </button>
+            <button type="button" id="ai-stop-btn" class="ai-send-btn" title="Stop Audio" style="display:none; background:var(--accent-danger); color:#fff; border-radius:4px;">
+              <i class="ph-bold ph-stop" style="font-size:18px;"></i>
+            </button>
             <textarea id="ai-input" class="ai-input" placeholder="Ask AI..." rows="1"></textarea>
             <button type="submit" id="ai-send" class="ai-send-btn" title="Send Request">
               <i class="ph-bold ph-paper-plane-right" style="font-size:18px;"></i>
@@ -114,6 +121,51 @@
           input.style.height = 'auto';
         });
       }
+      
+      // Voice Integration
+      const voiceBtn = document.getElementById('ai-voice-btn');
+      if (voiceBtn) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+          const recognition = new SpeechRecognition();
+          recognition.continuous = false;
+          recognition.interimResults = false;
+          
+          recognition.onstart = () => {
+             voiceBtn.innerHTML = '<i class="ph-fill ph-microphone" style="color:var(--accent-danger);"></i>';
+          };
+          
+          recognition.onresult = (e) => {
+             const text = e.results[0][0].transcript;
+             if(input) input.value = text;
+             useVoiceOutput = true; 
+             if(form) form.dispatchEvent(new Event('submit'));
+          };
+          
+          recognition.onerror = (e) => {
+             console.error('Speech error', e);
+             voiceBtn.innerHTML = '<i class="ph-bold ph-microphone" style="font-size:18px;"></i>';
+          };
+          
+          recognition.onend = () => {
+             voiceBtn.innerHTML = '<i class="ph-bold ph-microphone" style="font-size:18px;"></i>';
+          };
+          
+          voiceBtn.addEventListener('click', () => {
+             try { recognition.start(); } catch(err) {}
+          });
+        } else {
+          voiceBtn.style.display = 'none'; // Not supported
+        }
+      }
+
+      const stopBtn = document.getElementById('ai-stop-btn');
+      if (stopBtn) {
+         stopBtn.addEventListener('click', () => {
+             if (window.speechSynthesis) window.speechSynthesis.cancel();
+             stopBtn.style.display = 'none';
+         });
+      }
 
       // Quick Actions
       document.querySelectorAll('.ai-action-chip').forEach(chip => {
@@ -144,17 +196,25 @@
       
       if (contextMode === 'note') {
         const editorHtml = document.getElementById('editor-body')?.innerHTML || '';
-        context = window.Store.stripHtml(editorHtml);
+        const currentId = window.Editor ? window.Editor.getCurrentId() : null;
+        let metadataStr = '';
+        if (currentId) {
+           const note = window.Store.getNote(currentId);
+           if (note) {
+              metadataStr = `[METADATA: Title="${note.title}", Tags="${(note.tags||[]).join(', ')}", Pinned=${note.pinned ? 'true' : 'false'}]\n\n`;
+           }
+        }
+        context = metadataStr + editorHtml;
       } else if (contextMode === 'folder') {
         const currentId = window.Editor ? window.Editor.getCurrentId() : null;
         const note = currentId ? window.Store.getNote(currentId) : null;
         
         if (note && note.folderId) {
            const folderNotes = window.Store.getAllNotes().filter(n => n.folderId === note.folderId);
-           context = folderNotes.map(n => `Title: ${n.title}\nContent:\n${window.Store.stripHtml(n.content || '')}`).join('\n\n---\n\n');
+           context = folderNotes.map(n => `[Note: ${n.title} | Tags: ${(n.tags||[]).join(', ')}]\n${n.content || ''}`).join('\n\n---\n\n');
         } else {
            const allNotes = window.Store.getAllNotes();
-           context = allNotes.map(n => `Title: ${n.title}\nContent:\n${window.Store.stripHtml(n.content || '')}`).join('\n\n---\n\n');
+           context = allNotes.map(n => `[Note: ${n.title} | Tags: ${(n.tags||[]).join(', ')}]\n${n.content || ''}`).join('\n\n---\n\n');
         }
       }
 
@@ -178,12 +238,15 @@
            const payload = data.agent;
            if (payload.action === 'CHAT') {
                this._replaceLoadingWithMessage(loadingId, payload.text || 'No response.');
+               if (useVoiceOutput) this._speak(payload.text);
            } else {
-               this._executeAgentAction(payload.action, payload.text);
-               this._replaceLoadingWithMessage(loadingId, `✨ Automated Task: **${payload.action}**\n\nI have successfully updated your document for you!`);
+               this._executeAgentAction(payload);
+               this._replaceLoadingWithMessage(loadingId, `✨ Automated Task: **${payload.action}**\n\nI have successfully updated your workspace!`);
+               if (useVoiceOutput) this._speak(`Alright, I've successfully completed the ${payload.action.replace(/_/g, ' ')} task for you.`);
            }
         } else {
            this._replaceLoadingWithMessage(loadingId, data.result || 'No response generated.');
+           if (useVoiceOutput) this._speak(data.result);
         }
       } catch (err) {
         this._replaceLoadingWithMessage(loadingId, `⚠️ Error: ${err.message}`);
@@ -192,13 +255,151 @@
       }
     },
 
-    _executeAgentAction(action, newText) {
+    _executeAgentAction(payload) {
+       const { action, text, title, tags } = payload;
+
+       // Handle System actions first
+       if (action === 'CREATE_NOTE') {
+          const folderId = window.Sidebar && window.Sidebar.currentFolderId ? window.Sidebar.currentFolderId : null;
+          const target_title = title || '✨ AI Generated Note';
+          const strippedText = text ? text : ''; // don't format on create, openNote does it basically? Actually createNote takes markdown or text. Wait, Editor expects HTML usually
+          const newNote = window.Store.createNote(folderId, target_title, strippedText);
+          if (newNote && window.Editor) {
+             window.Editor.openNote(newNote.id);
+             window.NoteList.render();
+             window.showToast('🤖 AI created a new note', 'success');
+          }
+          return;
+       }
+       
+       if (!window.Editor) return;
+       const currentId = window.Editor.getCurrentId();
+       
+       if (action === 'UPDATE_TITLE' && currentId) {
+          if (title) {
+             window.Store.updateNote(currentId, { title });
+             document.getElementById('note-title-display').textContent = title;
+             window.NoteList.render();
+             window.showToast('🤖 AI renamed note', 'success');
+          }
+          return;
+       }
+       
+       if (action === 'ADD_TAG' && currentId) {
+          if (tags) {
+             const note = window.Store.getNote(currentId);
+             const tagArray = tags.split(',').map(t => t.trim().replace(/^#/, ''));
+             const currentTags = note.tags || [];
+             const merged = [...new Set([...currentTags, ...tagArray])];
+             window.Store.updateNote(currentId, { tags: merged });
+             if (window.Editor._renderTags) window.Editor._renderTags(merged);
+             window.Sidebar.renderTags();
+             window.showToast('🤖 AI added tags', 'success');
+          }
+          return;
+       }
+
+       if (action === 'DELETE_NOTE' && currentId) {
+          window.Store.deleteNote(currentId);
+          window.Editor.close();
+          window.NoteList.render();
+          window.Sidebar.renderFolders();
+          window.showToast('🤖 AI deleted note', 'danger');
+          return;
+       }
+
+       if (action === 'PIN_NOTE' && currentId) {
+          const note = window.Store.togglePin(currentId);
+          if (window.Editor._updatePinButton) window.Editor._updatePinButton(note.pinned);
+          window.NoteList.render();
+          window.showToast(note.pinned ? '🤖 AI pinned note' : '🤖 AI unpinned note', 'info');
+          return;
+       }
+
+       if (action === 'CHANGE_THEME_DARK') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          localStorage.setItem('mnemos_theme', 'dark');
+          window.showToast('🤖 Theme updated', 'success');
+          return;
+       }
+       if (action === 'CHANGE_THEME_LIGHT') {
+          document.documentElement.setAttribute('data-theme', 'light');
+          localStorage.setItem('mnemos_theme', 'light');
+          window.showToast('🤖 Theme updated', 'success');
+          return;
+       }
+
+       // Text manipulating actions
        const body = document.getElementById('editor-body');
-       if (!body || !window.Editor) return;
+       if (!body) return;
        
-       const parsedHtml = this._parseMarkdown(newText);
+       // For agent actions, the AI sends raw HTML — do NOT run through _parseMarkdown which escapes tags!
+       const parsedHtml = this._sanitizeAgentHtml(text || '');
        
-       if (action === 'REPLACE_ALL') {
+       if (action === 'FORMAT_TEXT' || action === 'CHANGE_COLOR' || action === 'INSERT_LINK') {
+          const { targetText, format, color, isBg, url } = payload;
+          if (!targetText) {
+             window.showToast('🤖 No target text specified for formatting', 'warning');
+             return;
+          }
+          if (action === 'FORMAT_TEXT' && !format) {
+             window.showToast('🤖 No format specified', 'warning');
+             return;
+          }
+          if (window.find) {
+             // BUGFIX: Focus editor and collapse caret to top so `window.find` searches downwards inside document
+             body.focus();
+             const rng = document.createRange();
+             rng.selectNodeContents(body);
+             rng.collapse(true);
+             const sel = document.getSelection();
+             sel.removeAllRanges();
+             sel.addRange(rng);
+
+             // Search only downwards
+             const found = window.find(targetText, false, false, false, false, false, false);
+             
+             if (found) {
+                // BUGFIX: Verify selection is actually inside editor, not in Chat Panel
+                const currentSel = window.getSelection();
+                if (currentSel.rangeCount > 0 && body.contains(currentSel.anchorNode)) {
+                   if (action === 'CHANGE_COLOR') {
+                      if (isBg) {
+                          if (!document.execCommand('hiliteColor', false, color || 'yellow')) {
+                              document.execCommand('backColor', false, color || 'yellow');
+                          }
+                      } else {
+                          document.execCommand('foreColor', false, color || 'red');
+                      }
+                   } else if (action === 'INSERT_LINK') {
+                      document.execCommand('createLink', false, url || '#');
+                   } else {
+                      if (['bold', 'italic', 'underline', 'strikeThrough'].includes(format)) {
+                         document.execCommand(format, false, null);
+                      } else if (['h1', 'h2', 'h3'].includes(format)) {
+                         document.execCommand('formatBlock', false, format.toUpperCase());
+                      } else if (format === 'ul') {
+                         document.execCommand('insertUnorderedList', false, null);
+                      } else if (format === 'ol') {
+                         document.execCommand('insertOrderedList', false, null);
+                      } else if (format === 'checklist') {
+                         document.execCommand('insertUnorderedList', false, null);
+                      }
+                   }
+                   window.Editor._scheduleAutoSave();
+                } else {
+                   window.showToast('🤖 Target text found outside document boundaries', 'warning');
+                }
+             } else {
+                window.showToast('🤖 Could not find target text to format', 'warning');
+             }
+          }
+       } else if (action === 'REPLACE_ALL') {
+          let cleanHtml = parsedHtml
+             .replace(/\[METADATA:[^\]]*\]\s*/gi, '')
+             .replace(/(<br\s*\/?\s*>(\s*)){3,}/gi, '<br><br>')
+             .trim();
+          
           body.innerHTML = '';
           document.getSelection().removeAllRanges();
           const p = document.createElement('p');
@@ -206,8 +407,8 @@
           const rangeObj = document.createRange();
           rangeObj.selectNodeContents(body);
           document.getSelection().addRange(rangeObj);
-          document.execCommand('insertHTML', false, parsedHtml);
-       } else if (action === 'APPEND_BOTTOM') {
+          document.execCommand('insertHTML', false, cleanHtml);
+       } else if (action === 'APPEND_BOTTOM' || action === 'INSERT_IMAGE' || action === 'GENERATE_TABLE') {
           const rangeObj = document.createRange();
           rangeObj.selectNodeContents(body);
           rangeObj.collapse(false); // end
@@ -229,6 +430,23 @@
        window.showToast(`🤖 AI executed ${action}`, 'success');
     },
 
+    _speak(text) {
+      if (!window.speechSynthesis || !text) return;
+      window.speechSynthesis.cancel();
+      const cleanText = text.replace(/[*_#"`]/g, '').trim();
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      
+      const stopBtn = document.getElementById('ai-stop-btn');
+      utterance.onstart = () => { if(stopBtn) stopBtn.style.display = 'flex'; };
+      utterance.onend = () => { if(stopBtn) stopBtn.style.display = 'none'; };
+      utterance.onerror = () => { if(stopBtn) stopBtn.style.display = 'none'; };
+
+      window.speechSynthesis.speak(utterance);
+      useVoiceOutput = false; 
+    },
+
     async _handleQuickAction(action) {
       if (isWaiting) return;
       isWaiting = true;
@@ -239,16 +457,24 @@
       
       if (contextMode === 'note') {
         const editorHtml = document.getElementById('editor-body')?.innerHTML || '';
-        content = window.Store.stripHtml(editorHtml);
+        const currentId = window.Editor ? window.Editor.getCurrentId() : null;
+        let metadataStr = '';
+        if (currentId) {
+           const note = window.Store.getNote(currentId);
+           if (note) {
+              metadataStr = `[METADATA: Title="${note.title}", Tags="${(note.tags||[]).join(', ')}", Pinned=${note.pinned ? 'true' : 'false'}]\n\n`;
+           }
+        }
+        content = metadataStr + editorHtml;
       } else if (contextMode === 'folder') {
         const currentId = window.Editor ? window.Editor.getCurrentId() : null;
         const note = currentId ? window.Store.getNote(currentId) : null;
         if (note && note.folderId) {
            const folderNotes = window.Store.getAllNotes().filter(n => n.folderId === note.folderId);
-           content = folderNotes.map(n => `Title: ${n.title}\nContent:\n${window.Store.stripHtml(n.content || '')}`).join('\n\n---\n\n');
+           content = folderNotes.map(n => `[Note: ${n.title} | Tags: ${(n.tags||[]).join(', ')}]\n${n.content || ''}`).join('\n\n---\n\n');
         } else {
            const allNotes = window.Store.getAllNotes();
-           content = allNotes.map(n => `Title: ${n.title}\nContent:\n${window.Store.stripHtml(n.content || '')}`).join('\n\n---\n\n');
+           content = allNotes.map(n => `[Note: ${n.title} | Tags: ${(n.tags||[]).join(', ')}]\n${n.content || ''}`).join('\n\n---\n\n');
         }
       }
 
@@ -533,7 +759,7 @@
 
     _parseMarkdown(text) {
       if (!text) return '';
-      // Basic markdown parser
+      // Basic markdown parser for CHAT display messages (escapes HTML for safety)
       let html = text
         .replace(/</g, '&lt;').replace(/>/g, '&gt;') // escape HTML
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -545,6 +771,18 @@
         .replace(/\n/g, '<br>');
       
       return html;
+    },
+
+    _sanitizeAgentHtml(text) {
+      if (!text) return '';
+      // For agent actions: the AI sends back raw HTML (tables, images, links).
+      // We must NOT escape angle brackets. Only do light cleanup.
+      return text
+        .replace(/\[METADATA:[^\]]*\]\s*/gi, '')         // strip leaked metadata
+        .replace(/(<br\s*\/?>\s*){4,}/gi, '<br><br>')    // collapse excessive br
+        .replace(/\\n/g, '\n')                           // unescape literal \n
+        .replace(/\\'/g, "'")                             // unescape escaped quotes
+        .trim();
     }
   };
 })();

@@ -183,16 +183,26 @@ router.post('/agent', auth, aiLimiter, async (req, res) => {
   if (!prompt) return res.status(400).json({ msg: 'Missing prompt' });
 
   try {
-    const systemPrompt = `You are an Agentic Editor Assistant. Your job is to understand what the user wants to do with their workspace or currently open document. You must return a strict JSON object with properties: "action" (string), "text" (string), "title" (string, optional), and "tags" (string, optional). DO NOT wrap the output in markdown block ticks like \`\`\`json. 
+    const systemPrompt = `You are the Mnemos Agentic Editor Assistant. Your job is to understand what the user wants to do with their workspace or currently open document. You must return a strict JSON object with properties: "action", "text" (optional), "title" (optional), "tags" (optional), "targetText" (optional, exact verbatim string from context), "format" (optional), "color" (optional), "isBg" (boolean, optional), "url" (optional). DO NOT wrap the output in markdown \`\`\`json. 
 
 Available actions:
-1. "REPLACE_ALL": Rewrite or format the entire text in the context. "text" is the FULL modified document.
-2. "APPEND_BOTTOM": Add something to the bottom of the document. "text" is ONLY the text to append.
-3. "INSERT_TOP": Add something to the top of the document. "text" is ONLY the text to prepend.
-4. "CREATE_NOTE": The user wants you to create a brand new note based on their prompt. "text" is the newly generated note content, "title" is the note title.
-5. "UPDATE_TITLE": The user wants to rename the current note. "title" is the new name.
-6. "ADD_TAG": The user wants to add tags to the current note. "tags" is a comma separated list of tags (e.g. "urgent, marketing").
-7. "CHAT": The user is just asking a question. "text" is your conversational response.
+1. "REPLACE_ALL": Rewrite or format the entire text in the context. "text" is the FULL modified document. WARNING: You MUST retain all existing links <a> and images <img> from the context unless EXPLICITLY instructed to remove them!
+2. "APPEND_BOTTOM" / "INSERT_TOP": Add text to the designated area. "text" is ONLY the text to add.
+3. "CREATE_NOTE": Create a brand new note. "text" is the note content, "title" is the title.
+4. "UPDATE_TITLE": Rename current note. "title" is the new name.
+5. "ADD_TAG": Add tags to current note. "tags" is a comma separated list.
+6. "FORMAT_TEXT": Format specific text in the editor. "targetText" is the EXACT verbatim text to format. "format" is one of: [bold, italic, underline, strikeThrough, h1, h2, h3, ul, ol, checklist].
+7. "CHANGE_COLOR": Color specific text. "targetText" is the verbatim text. "color" is a CSS color. "isBg" is true if highlighting background, false if text color.
+8. "INSERT_IMAGE": Insert an image to the bottom. "text" is an HTML img tag like: <img src="https://source.unsplash.com/800x400/?keyword" alt="description" style="max-width:100%;border-radius:8px;margin:8px 0;">.
+9. "INSERT_LINK": Hyperlink text. "targetText" is the verbatim text, "url" is the link.
+10. "DELETE_NOTE" / "PIN_NOTE": System commands to delete or pin the current note.
+11. "CHANGE_THEME_DARK" / "CHANGE_THEME_LIGHT": Toggle app UI themes visually.
+12. "GENERATE_TABLE": Generate an HTML table. "text" is the HTML <table> code.
+13. "CHAT": The user is just asking a question. "text" is your conversational response.
+CRITICAL RULES:
+- The document context may start with a [METADATA: ...] header. This is SYSTEM-INJECTED information for your reference only. NEVER include it in your output "text".
+- When performing REPLACE_ALL, output ONLY the document body HTML. Do NOT add your own opinions, commentary, or notes into the document content.
+- Do NOT add excessive <br> tags. Keep the output clean.
 
 Return ONLY valid, parseable JSON.`;
 
@@ -206,11 +216,34 @@ Return ONLY valid, parseable JSON.`;
     try {
       payload = JSON.parse(cleanedJsonString);
     } catch(err) {
-      // IF regex failed to parse json properly, fallback to CHAT output
-      payload = { action: 'CHAT', text: result };
+      console.warn('[AI /agent] JSON parse failed gracefully. Activating Regex Fallback.');
+      
+      let action = 'CHAT';
+      let text = result;
+      
+      const actionMatch = cleanedJsonString.match(/"action"\s*:\s*"([^"]+)"/i);
+      if (actionMatch) action = actionMatch[1];
+      
+      const textMatch = cleanedJsonString.match(/"text"\s*:\s*"([\s\S]*?)"\s*[,}]/i);
+      if (textMatch) {
+         text = textMatch[1];
+      }
+      
+      payload = { action, text };
+      
+      // Optional matches
+      const urlMatch = cleanedJsonString.match(/"url"\s*:\s*"([^"]+)"/i);
+      if (urlMatch) payload.url = urlMatch[1];
+      const targetMatch = cleanedJsonString.match(/"targetText"\s*:\s*"([^"]+)"/i);
+      if (targetMatch) payload.targetText = targetMatch[1];
+      const formatMatch = cleanedJsonString.match(/"format"\s*:\s*"([^"]+)"/i);
+      if (formatMatch) payload.format = formatMatch[1];
+      const colorMatch = cleanedJsonString.match(/"color"\s*:\s*"([^"]+)"/i);
+      if (colorMatch) payload.color = colorMatch[1];
     }
     
-    if(!['REPLACE_ALL', 'APPEND_BOTTOM', 'INSERT_TOP', 'CREATE_NOTE', 'UPDATE_TITLE', 'ADD_TAG', 'CHAT'].includes(payload.action)) {
+    const validActions = ['REPLACE_ALL', 'APPEND_BOTTOM', 'INSERT_TOP', 'CREATE_NOTE', 'UPDATE_TITLE', 'ADD_TAG', 'FORMAT_TEXT', 'CHANGE_COLOR', 'INSERT_IMAGE', 'INSERT_LINK', 'DELETE_NOTE', 'PIN_NOTE', 'CHANGE_THEME_DARK', 'CHANGE_THEME_LIGHT', 'GENERATE_TABLE', 'CHAT'];
+    if(!validActions.includes(payload.action)) {
        payload.action = 'CHAT'; 
     }
 
