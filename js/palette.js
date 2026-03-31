@@ -13,6 +13,12 @@
     { type: 'command', title: 'Export Notes', id: 'export_notes', icon: 'ph-upload-simple', shortcut: 'Ctrl+E' },
     { type: 'command', title: 'Show Keyboard Shortcuts', id: 'show_shortcuts', icon: 'ph-keyboard', shortcut: 'Ctrl+/' },
     { type: 'command', title: 'Sign In / Profile', id: 'profile', icon: 'ph-user-circle', shortcut: '' },
+    
+    // AI Commands
+    { type: 'ai-action', title: '✨ Summarize Current Note', id: 'ai_summarize', icon: 'ph-magic-wand', action: 'summarize' },
+    { type: 'ai-action', title: '✨ Extract Action Items', id: 'ai_actions', icon: 'ph-check-square-offset', action: 'actions' },
+    { type: 'ai-action', title: '✨ Generate Study Flashcards', id: 'ai_flashcards', icon: 'ph-cards', action: 'flashcards' },
+    { type: 'ai-action', title: '✨ Ask AI a Question', id: 'ai_ask', icon: 'ph-chat-circle-text', action: 'chat' },
   ];
 
   window.Palette = {
@@ -132,6 +138,15 @@
             const authBtn = document.getElementById('auth-btn');
             if (authBtn) authBtn.click();
             break;
+        }
+      } else if (item.type === 'ai-action') {
+        if (window.AIPanel) {
+          window.AIPanel.open();
+          if (item.action === 'chat') {
+            document.getElementById('ai-input')?.focus();
+          } else {
+            window.AIPanel._handleQuickAction(item.action);
+          }
         }
       } else if (item.type === 'note') {
         window.Editor.open(item.noteId);

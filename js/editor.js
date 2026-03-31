@@ -297,10 +297,107 @@
           this._scheduleAutoSave();
         });
       }
+
+      const titleBtn = document.getElementById('ai-title-btn');
+      if (titleBtn) {
+        titleBtn.addEventListener('click', async () => {
+          if (!currentNoteId) return;
+          const body = document.getElementById('editor-body');
+          const content = window.Store.stripHtml(body.innerHTML || '');
+          if (content.length < 15) {
+            window.showToast('Please write more content first.', 'warning');
+            return;
+          }
+          
+          titleBtn.disabled = true;
+          titleBtn.innerHTML = '<i class="ph-bold ph-spinner" style="animation: spin 1s linear infinite;"></i> <span class="desktop-only" style="margin-left:4px;">Thinking...</span>';
+          
+          try {
+            const token = window.Auth.getToken();
+            const res = await fetch(`${window.API_BASE_URL}/ai/complete`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ prompt: 'Generate a short, concise, and professional title for this note without quotes or extra text. Max 6 words.', context: content.substring(0, 5000) })
+            });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            
+            if (data.result) {
+              const cleanTitle = data.result.replace(/"/g, '').trim();
+              if (titleInput) titleInput.value = cleanTitle;
+              this._scheduleAutoSave();
+              window.showToast('✨ Auto-Title generated', 'success');
+            }
+          } catch(e) {
+            window.showToast('Failed to generate title', 'danger');
+          } finally {
+            titleBtn.disabled = false;
+            titleBtn.innerHTML = '<i class="ph-fill ph-magic-wand" style="color:var(--accent-primary);"></i> <span class="desktop-only" style="margin-left:4px;">Auto-Title</span>';
+          }
+        });
+      }
     },
 
     _bindTagInput() {
       const tagInput = document.getElementById('tag-input');
+      const tagsWrapper = document.querySelector('.editor-tags-wrapper');
+      
+      // ✅ AI PRO: Auto-Tag Button
+      if (tagsWrapper) {
+        const aiTagBtn = document.createElement('button');
+        aiTagBtn.className = 'btn btn-ghost ai-tag-btn';
+        aiTagBtn.innerHTML = '<i class="ph-fill ph-magic-wand" style="color:var(--accent-primary);"></i> Auto-Tag';
+        aiTagBtn.style.cssText = 'font-size: 11px; padding: 2px 8px; margin-left: auto;';
+        aiTagBtn.title = 'AI Auto-Tag';
+        
+        aiTagBtn.onclick = async () => {
+          if (!currentNoteId) return;
+          const note = window.Store.getNote(currentNoteId);
+          const content = window.Store.stripHtml(note.content || '');
+          if (content.length < 20) {
+            window.showToast('Please write more content first', 'warning');
+            return;
+          }
+          
+          aiTagBtn.innerHTML = '<i class="ph-bold ph-spinner" style="animation: spin 1s linear infinite;"></i> Generating...';
+          aiTagBtn.disabled = true;
+          
+          try {
+            const token = window.Auth.getToken();
+            const res = await fetch(`${window.API_BASE_URL}/ai/tags`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ content: content.substring(0, 15000), existingTags: window.Store.getAllTags() })
+            });
+            if (!res.ok) throw new Error('AI tagging failed');
+            const data = await res.json();
+            
+            if (data.tags && data.tags.length > 0) {
+              const newTags = data.tags.filter(t => !note.tags.includes(t));
+              if (newTags.length > 0) {
+                note.tags.push(...newTags);
+                window.Store.updateNote(currentNoteId, { tags: note.tags });
+                this._renderTags(note.tags);
+                window.Sidebar.renderTags();
+                window.NoteList.updateCard(currentNoteId);
+                window.showToast('✨ Tags generated', 'success');
+              } else {
+                window.showToast('Note already has these tags', 'info');
+              }
+            } else {
+              window.showToast('No new tags suggested.', 'info');
+            }
+          } catch (e) {
+            window.showToast(e.message, 'danger');
+          } finally {
+            aiTagBtn.innerHTML = '<i class="ph-fill ph-magic-wand" style="color:var(--accent-primary);"></i> Auto-Tag';
+            aiTagBtn.disabled = false;
+          }
+        };
+        
+        tagsWrapper.appendChild(aiTagBtn);
+      }
+
       if (tagInput) {
         tagInput.addEventListener('keydown', (e) => {
           if (e.key === 'Enter' || e.key === ',') {
@@ -341,16 +438,109 @@
           this._handleSlashTrigger(e);
         });
 
-        body.addEventListener('keydown', (e) => {
-          // Tab to indent properly in lists
+        body.addEventListener('keydown', async (e) => {
+          // Tab to indent properly in lists or AI continue
           if (e.key === 'Tab') {
             e.preventDefault();
+            
+            // ✅ AI PRO: Smart Write (Continue sentence)
+            const sel = window.getSelection();
+            if (sel.isCollapsed && sel.focusNode) {
+              const textNode = sel.focusNode;
+              const textContent = textNode.textContent || '';
+              const offset = sel.focusOffset;
+              
+              // Trigger AI if Tab is pressed at the end of a non-empty text node
+              if (offset === textContent.length && textContent.trim().length > 5) {
+                const buttonHtml = '<span id="ai-ghost-text" style="color:var(--text-tertiary);" contenteditable="false"><i class="ph-bold ph-spinner" style="animation: spin 1s linear infinite;"></i> AI writing...</span>';
+                document.execCommand('insertHTML', false, buttonHtml);
+                
+                try {
+                  const fullText = window.Store.stripHtml(body.innerHTML);
+                  const token = window.Auth.getToken();
+                  const res = await fetch(`${window.API_BASE_URL}/ai/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ prompt: 'Please write the next 1-2 sentences to seamlessly continue the text. Output ONLY the continuation sentences, nothing else.', context: fullText.substring(0, 15000) })
+                  });
+                  
+                  const ghostEl = document.getElementById('ai-ghost-text');
+                  if (!res.ok) throw new Error();
+                  const data = await res.json();
+                  
+                  if (data.result && ghostEl) {
+                    ghostEl.outerHTML = ' ' + data.result;
+                    this._scheduleAutoSave();
+                    window.showToast('✨ AI Continued', 'success');
+                  } else if (ghostEl) {
+                    ghostEl.outerHTML = '';
+                  }
+                } catch(e) {
+                  const ghostEl = document.getElementById('ai-ghost-text');
+                  if (ghostEl) ghostEl.outerHTML = '';
+                  window.showToast('AI Continuation failed.', 'warning');
+                }
+                return;
+              }
+            }
+
             if (e.shiftKey) {
               document.execCommand('outdent', false, null);
             } else {
               document.execCommand('indent', false, null);
             }
             this._scheduleAutoSave();
+          } else if (e.key === 'Enter') {
+            // ✅ AI PRO: Inline /ask command
+            const sel = window.getSelection();
+            if (sel.isCollapsed && sel.focusNode) {
+              const textNode = sel.focusNode;
+              const textContent = textNode.textContent || '';
+              
+              if (textContent.startsWith('/ask ')) {
+                e.preventDefault();
+                const promptText = textContent.replace('/ask ', '').trim();
+                
+                // Clear the node text
+                textNode.textContent = '';
+                
+                // Insert loading
+                const buttonHtml = `<span id="ai-ghost-ask" style="color:var(--text-tertiary);" contenteditable="false"><i class="ph-bold ph-spinner" style="animation: spin 1s linear infinite;"></i> AI generating...</span>`;
+                document.execCommand('insertHTML', false, buttonHtml);
+                
+                try {
+                  const token = window.Auth.getToken();
+                  const res = await fetch(`${window.API_BASE_URL}/ai/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ prompt: promptText })
+                  });
+                  
+                  const ghostEl = document.getElementById('ai-ghost-ask');
+                  if (!res.ok) throw new Error();
+                  const data = await res.json();
+                  
+                  if (data.result && ghostEl) {
+                    const selObj = window.getSelection();
+                    const rangeObj = document.createRange();
+                    rangeObj.selectNode(ghostEl);
+                    selObj.removeAllRanges();
+                    selObj.addRange(rangeObj);
+                    
+                    const htmlToInsert = window.AIPanel ? window.AIPanel._parseMarkdown(data.result) : data.result;
+                    document.execCommand('insertHTML', false, htmlToInsert);
+                    
+                    this._scheduleAutoSave();
+                  } else if (ghostEl) {
+                    ghostEl.remove();
+                  }
+                } catch(e) {
+                  const ghostEl = document.getElementById('ai-ghost-ask');
+                  if (ghostEl) ghostEl.outerHTML = '⚠️ Failed to generate response.';
+                }
+                return;
+              }
+            }
           }
         });
 
@@ -472,8 +662,111 @@
 
       // Bubble buttons
       document.querySelectorAll('.bubble-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
           e.preventDefault();
+          
+          if (btn.classList.contains('ai-inline-btn')) {
+            const mode = btn.dataset.ai;
+            const sel = window.getSelection();
+            
+            if (!sel.isCollapsed && sel.rangeCount > 0) {
+              const text = sel.toString();
+              const range = sel.getRangeAt(0);
+              
+              if (text.trim().length > 0) {
+                const prompts = {
+                  'improve': 'Rewrite and polish the following text to make it sound professional and extremely clear. Ensure you only return the requested text and no surrounding pleasantries.',
+                  'format': 'Format the following messy text into a clean, well-structured Markdown list or table. Return only the formatted text.',
+                  'fix': 'Fix all grammar, spelling, and punctuation errors in the following text. Do not rewrite the sentence structure unnecessarily. Return only the fixed text.',
+                  'translate': 'Translate the following text into clear, fluent English. Return only the translation.',
+                  'shorter': 'Make the following text significantly shorter and punchier. Return only the shortened text.',
+                  'longer': 'Expand the following text organically. Add relevant details or elaborations. Return only the expanded text.',
+                  'tone': 'Rewrite the following text to have a highly professional, confident, and business-appropriate tone. Return only the result.',
+                  'explain': 'Explain the following text or concept simply, as if I am 5 years old (ELI5). Be concise.'
+                };
+                
+                const promptToUse = prompts[mode] || prompts['improve'];
+                
+                // Keep the selection but change background
+                document.getElementById('floating-bubble').style.display = 'none';
+                
+                const span = document.createElement('span');
+                span.style.backgroundColor = 'var(--accent-primary)';
+                span.style.color = '#fff';
+                span.style.padding = '0 4px';
+                span.style.borderRadius = '2px';
+                span.className = 'ai-processing-inline';
+                span.textContent = text;
+                
+                range.deleteContents();
+                range.insertNode(span);
+                
+                try {
+                  const token = window.Auth.getToken();
+                  const res = await fetch(`${window.API_BASE_URL}/ai/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ prompt: promptToUse + `\n\nText: "${text}"` })
+                  });
+                  if (!res.ok) throw new Error('AI Error');
+                  const data = await res.json();
+                  
+                  if (data.result) {
+                    const selObj = window.getSelection();
+                    const rangeObj = document.createRange();
+                    rangeObj.selectNode(span);
+                    selObj.removeAllRanges();
+                    selObj.addRange(rangeObj);
+                    
+                    if (mode === 'explain') {
+                      // Put original text back
+                      document.execCommand('insertText', false, text);
+                      
+                      // Show Modal
+                      const modal = document.getElementById('ai-modal-overlay');
+                      const body = document.getElementById('ai-modal-body');
+                      const title = document.getElementById('ai-modal-title-text');
+                      const footer = document.getElementById('ai-modal-footer');
+                      
+                      title.textContent = 'ELI5 Explanation';
+                      footer.style.display = 'none';
+                      // Use AIPanel markdown parser if available
+                      body.innerHTML = window.AIPanel ? window.AIPanel._parseMarkdown(data.result) : data.result;
+                      modal.style.display = 'flex';
+                    } else if (mode === 'format') {
+                      // format as markdown HTML
+                      const htmlToInsert = window.AIPanel ? window.AIPanel._parseMarkdown(data.result) : data.result;
+                      document.execCommand('insertHTML', false, htmlToInsert);
+                      this._scheduleAutoSave();
+                      window.showToast('✨ Text formatted', 'success');
+                    } else {
+                      document.execCommand('insertText', false, data.result);
+                      this._scheduleAutoSave();
+                      window.showToast('✨ Text replaced inline', 'success');
+                    }
+                  } else {
+                    const selObj = window.getSelection();
+                    const rangeObj = document.createRange();
+                    rangeObj.selectNode(span);
+                    selObj.removeAllRanges();
+                    selObj.addRange(rangeObj);
+                    document.execCommand('insertText', false, text);
+                  }
+                } catch (err) {
+                  const selObj = window.getSelection();
+                  const rangeObj = document.createRange();
+                  rangeObj.selectNode(span);
+                  selObj.removeAllRanges();
+                  selObj.addRange(rangeObj);
+                  document.execCommand('insertText', false, text);
+                  
+                  window.showToast(`⚠️ AI Inline Mod failed`, 'danger');
+                }
+              }
+            }
+            return;
+          }
+
           const cmd = btn.dataset.command;
           const val = btn.dataset.value || null;
           if (cmd === 'createLink') {
@@ -547,6 +840,11 @@
         { id: 'callout', name: 'Callout', desc: 'Info box for key notes', icon: 'ph-info' },
         { id: 'table', name: 'Table', desc: '3x3 Data grid', icon: 'ph-table' },
         { id: 'divider', name: 'Divider', desc: 'Visual separator', icon: 'ph-minus' },
+        { id: 'ai-summarize', name: 'Summarize Note', desc: '✨ Generate AI summary', icon: 'ph-magic-wand' },
+        { id: 'ai-actions', name: 'Extract Actions', desc: '✨ Find action items', icon: 'ph-check-square-offset' },
+        { id: 'ai-flashcards', name: 'Flashcards', desc: '✨ Create study cards', icon: 'ph-cards' },
+        { id: 'ai-quiz', name: 'Quiz Me', desc: '✨ Generate a quick test', icon: 'ph-student' },
+        { id: 'ai-mindmap', name: 'Mind Map', desc: '✨ Map concepts visually', icon: 'ph-graph' }
       ];
 
       const container = document.getElementById('slash-menu-items');
@@ -577,7 +875,7 @@
     },
 
     _selectSlashItem() {
-      const commands = ['h1', 'h2', 'callout', 'table', 'divider'];
+      const commands = ['h1', 'h2', 'callout', 'table', 'divider', 'ai-summarize', 'ai-actions', 'ai-flashcards', 'ai-quiz', 'ai-mindmap'];
       const cmd = commands[this._slashIndex];
       this._hideSlashMenu();
       
@@ -590,6 +888,15 @@
     },
 
     _executeSlashCommand(cmd) {
+      if (cmd && cmd.startsWith('ai-')) {
+        const action = cmd.replace('ai-', '');
+        if (window.AIPanel) {
+          window.AIPanel.open();
+          window.AIPanel._handleQuickAction(action);
+        }
+        return;
+      }
+      
       if (cmd === 'h1' || cmd === 'h2') {
         document.execCommand('formatBlock', false, cmd);
       } else if (cmd === 'divider') {

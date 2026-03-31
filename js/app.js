@@ -130,6 +130,7 @@
     window.NoteList.init();
     window.Editor.init();
     window.ShortcutManager.init();
+    window.AIPanel.init(); // ✅ Initialize AI Panel
 
     // ✅ PRO: Local-First Rendering
     // Now trigger the silent background sync if logged in

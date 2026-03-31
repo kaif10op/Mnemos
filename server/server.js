@@ -136,6 +136,7 @@ app.use(async (req, res, next) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/share', require('./routes/share')); // ✅ Sharing endpoints
+app.use('/api/ai', require('./routes/ai')); // ✅ Smart AI endpoints
 
 // ✅ PRO CACHING: Aggressive Browser-Level Caching for Static Assets
 const staticOptions = {

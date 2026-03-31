@@ -34,6 +34,7 @@
   <link rel="stylesheet" href="css/editor.css" />
   <link rel="stylesheet" href="css/palette.css" />
   <link rel="stylesheet" href="css/auth-portal.css" />
+  <link rel="stylesheet" href="css/ai-panel.css" />
 </head>
 <body>
 
@@ -210,6 +211,7 @@
             
             <div class="toolbar-divider" style="height: 20px; margin: 0 8px;"></div>
 
+            <button class="editor-action-btn" id="ai-toggle-btn" title="Mnemos AI" aria-label="Mnemos AI"><i class="ph-bold ph-magic-wand" style="font-size:18px; color: var(--accent-primary);"></i></button>
             <button class="editor-action-btn" id="copy-btn" title="Copy to clipboard" aria-label="Copy to clipboard"><i class="ph-bold ph-copy" style="font-size:18px;"></i></button>
             <button class="editor-action-btn" id="share-btn" title="Share note" aria-label="Share note"><i class="ph-bold ph-share-network" style="font-size:18px;"></i></button>
             <button class="editor-action-btn" id="pin-btn" title="Pin note" aria-label="Pin note"><i class="ph-bold ph-push-pin" style="font-size:18px;"></i></button>
@@ -278,7 +280,7 @@
         </div>
 
         <!-- Title -->
-        <div class="editor-title-wrapper">
+        <div class="editor-title-wrapper" style="display:flex; align-items:center; gap:8px;">
           <input
             type="text"
             id="editor-title"
@@ -286,7 +288,11 @@
             placeholder="Note title..."
             aria-label="Note title input"
             autocomplete="off"
+            style="flex: 1;"
           />
+          <button id="ai-title-btn" class="btn btn-ghost" title="Auto-Title with AI" style="white-space:nowrap; font-size:12px; height:32px; padding:0 12px; color:var(--text-secondary);">
+            <i class="ph-fill ph-magic-wand" style="color:var(--accent-primary);"></i> <span class="desktop-only" style="margin-left:4px;">Auto-Title</span>
+          </button>
         </div>
 
         <!-- Tags -->
@@ -305,12 +311,19 @@
         <!-- Content -->
         <div class="editor-body-wrapper" id="editor-body-wrapper">
           <!-- Selection Floating Bubble -->
-          <div id="floating-bubble" class="floating-bubble" style="display: none;">
+          <div id="floating-bubble" class="floating-bubble" style="display: none; padding: 4px; gap: 2px;">
             <button class="bubble-btn" data-command="bold" title="Bold"><i class="ph ph-text-b"></i></button>
             <button class="bubble-btn" data-command="italic" title="Italic"><i class="ph ph-text-italic"></i></button>
             <button class="bubble-btn" data-command="createLink" title="Link"><i class="ph ph-link"></i></button>
             <div class="bubble-divider"></div>
-            <button class="bubble-btn" data-command="formatBlock" data-value="blockquote" title="Quote"><i class="ph ph-quotes"></i></button>
+            
+            <!-- Inline AI Suite -->
+            <button class="bubble-btn ai-inline-btn" data-ai="improve" title="✨ Rewrite"><i class="ph-fill ph-magic-wand" style="color:var(--accent-primary);"></i> <span style="font-size:11px; font-weight:600; margin-left:4px;">Rewrite</span></button>
+            <button class="bubble-btn ai-inline-btn" data-ai="format" title="✨ Magic Format"><i class="ph-bold ph-list-dashes" style="color:var(--text-secondary);"></i></button>
+            <button class="bubble-btn ai-inline-btn" data-ai="fix" title="✨ Fix Grammar"><i class="ph-bold ph-check-square" style="color:var(--accent-success);"></i></button>
+            <button class="bubble-btn ai-inline-btn" data-ai="translate" title="✨ Translate to English"><i class="ph-bold ph-translate" style="color:var(--text-secondary);"></i></button>
+            <button class="bubble-btn ai-inline-btn" data-ai="shorter" title="✨ Make Shorter"><i class="ph-bold ph-arrows-in-line-horizontal" style="color:var(--text-secondary);"></i></button>
+            <button class="bubble-btn ai-inline-btn" data-ai="explain" title="✨ Explain (ELI5)"><i class="ph-bold ph-question" style="color:var(--text-secondary);"></i></button>
           </div>
 
           <!-- 🧩 Unified Block Manipulation Toolbar (Contextual) -->
@@ -377,6 +390,28 @@
   <!-- ══════ TOAST CONTAINER ══════ -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
+  <!-- ══════ AI INTERACTIVE MODAL (Flashcards/Quizzes/Mindmaps) ══════ -->
+  <div id="ai-modal-overlay" class="modal-overlay" style="z-index: 1000; display: none;">
+    <div class="modal-content" style="max-width: 640px; width: 90%; background: var(--bg-primary); border-radius: 16px; border: 1px solid var(--border-default); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 48px rgba(0,0,0,0.6);">
+      <div style="padding: 16px; border-bottom: 1px solid var(--border-default); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary);">
+        <div style="font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <i class="ph-fill ph-magic-wand" style="color:var(--accent-primary);"></i> <span id="ai-modal-title-text" style="font-size: 15px;">AI Interface</span>
+        </div>
+        <button id="ai-modal-close" class="btn btn-ghost" style="padding: 4px; height: auto;">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+      <div id="ai-modal-body" style="padding: 32px 24px; min-height: 350px; max-height: 70vh; overflow-y: auto; background: var(--bg-tertiary); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; font-size: 15px; line-height: 1.5;">
+         <!-- Content injected here -->
+      </div>
+      <div id="ai-modal-footer" style="padding: 16px; border-top: 1px solid var(--border-default); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); display: none;">
+        <button id="ai-modal-btn-left" class="btn btn-ghost" style="border: 1px solid var(--border-default);">Previous</button>
+        <div id="ai-modal-status" style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">1 / 10</div>
+        <button id="ai-modal-btn-right" class="btn btn-primary">Next</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══════ MODAL ══════ -->
   <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal" id="modal"></div>
@@ -412,6 +447,14 @@
   <script src="js/sidebar.js"></script>
   <script src="js/notelist.js"></script>
   <script src="js/shortcuts.js"></script>
+  <script src="js/ai-panel.js"></script>
+  
+  <!-- Mermaid for Mind Maps -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+  </script>
+  
   <script src="js/app.js"></script>
 
   <!-- 🚀 UTILS & SYSTEMS -->
