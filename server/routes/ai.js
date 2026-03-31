@@ -198,11 +198,16 @@ Available actions:
 10. "DELETE_NOTE" / "PIN_NOTE": System commands to delete or pin the current note.
 11. "CHANGE_THEME_DARK" / "CHANGE_THEME_LIGHT": Toggle app UI themes visually.
 12. "GENERATE_TABLE": Generate an HTML table. "text" is the HTML <table> code.
-13. "CHAT": The user is just asking a question. "text" is your conversational response.
+13. "TRANSLATE_TEXT": Translate specific text in-place. "targetText" is the exact verbatim text to translate. "text" is the translated version.
+14. "GENERATE_LIST": Generate an HTML list from a prompt. "text" is the HTML <ul> or <ol> code.
+15. "FIX_GRAMMAR": Fix grammar and spelling errors across the entire document. Works like REPLACE_ALL but focused on corrections only.
+16. "SUMMARIZE_INLINE": Summarize the document and append a summary section at the bottom. "text" is a structured HTML summary.
+17. "CHAT": The user is just asking a question. "text" is your conversational response.
 CRITICAL RULES:
 - The document context may start with a [METADATA: ...] header. This is SYSTEM-INJECTED information for your reference only. NEVER include it in your output "text".
-- When performing REPLACE_ALL, output ONLY the document body HTML. Do NOT add your own opinions, commentary, or notes into the document content.
+- When performing REPLACE_ALL or FIX_GRAMMAR, output ONLY the document body HTML. Do NOT add your own opinions, commentary, or notes into the document content.
 - Do NOT add excessive <br> tags. Keep the output clean.
+- For FIX_GRAMMAR, preserve ALL existing HTML structure, links, and images. ONLY fix text content.
 
 Return ONLY valid, parseable JSON.`;
 
@@ -242,7 +247,7 @@ Return ONLY valid, parseable JSON.`;
       if (colorMatch) payload.color = colorMatch[1];
     }
     
-    const validActions = ['REPLACE_ALL', 'APPEND_BOTTOM', 'INSERT_TOP', 'CREATE_NOTE', 'UPDATE_TITLE', 'ADD_TAG', 'FORMAT_TEXT', 'CHANGE_COLOR', 'INSERT_IMAGE', 'INSERT_LINK', 'DELETE_NOTE', 'PIN_NOTE', 'CHANGE_THEME_DARK', 'CHANGE_THEME_LIGHT', 'GENERATE_TABLE', 'CHAT'];
+    const validActions = ['REPLACE_ALL', 'APPEND_BOTTOM', 'INSERT_TOP', 'CREATE_NOTE', 'UPDATE_TITLE', 'ADD_TAG', 'FORMAT_TEXT', 'CHANGE_COLOR', 'INSERT_IMAGE', 'INSERT_LINK', 'DELETE_NOTE', 'PIN_NOTE', 'CHANGE_THEME_DARK', 'CHANGE_THEME_LIGHT', 'GENERATE_TABLE', 'TRANSLATE_TEXT', 'GENERATE_LIST', 'FIX_GRAMMAR', 'SUMMARIZE_INLINE', 'CHAT'];
     if(!validActions.includes(payload.action)) {
        payload.action = 'CHAT'; 
     }

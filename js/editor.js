@@ -527,7 +527,12 @@
                     selObj.removeAllRanges();
                     selObj.addRange(rangeObj);
                     
-                    const htmlToInsert = window.AIPanel ? window.AIPanel._parseMarkdown(data.result) : data.result;
+                    const htmlToInsert = data.result
+                      .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                      .replace(/`(.*?)`/g, '<code>$1</code>')
+                      .replace(/\n/g, '<br>');
                     document.execCommand('insertHTML', false, htmlToInsert);
                     
                     this._scheduleAutoSave();
@@ -731,12 +736,15 @@
                       title.textContent = 'ELI5 Explanation';
                       footer.style.display = 'none';
                       // Use AIPanel markdown parser if available
-                      body.innerHTML = window.AIPanel ? window.AIPanel._parseMarkdown(data.result) : data.result;
+                      body.innerHTML = data.result
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                        .replace(/`(.*?)`/g, '<code>$1</code>')
+                        .replace(/\n/g, '<br>');
                       modal.style.display = 'flex';
                     } else if (mode === 'format') {
-                      // format as markdown HTML
-                      const htmlToInsert = window.AIPanel ? window.AIPanel._parseMarkdown(data.result) : data.result;
-                      document.execCommand('insertHTML', false, htmlToInsert);
+                      // Format: AI may return HTML lists/tables — insert directly
+                      document.execCommand('insertHTML', false, data.result);
                       this._scheduleAutoSave();
                       window.showToast('✨ Text formatted', 'success');
                     } else {
@@ -840,6 +848,10 @@
         { id: 'callout', name: 'Callout', desc: 'Info box for key notes', icon: 'ph-info' },
         { id: 'table', name: 'Table', desc: '3x3 Data grid', icon: 'ph-table' },
         { id: 'divider', name: 'Divider', desc: 'Visual separator', icon: 'ph-minus' },
+        { id: 'code', name: 'Code Block', desc: 'Insert a code snippet', icon: 'ph-code' },
+        { id: 'quote', name: 'Blockquote', desc: 'Insert a styled quote', icon: 'ph-quotes' },
+        { id: 'checklist', name: 'Checklist', desc: 'Interactive checkbox list', icon: 'ph-check-square' },
+        { id: 'image', name: 'Image (URL)', desc: 'Insert image from URL', icon: 'ph-image' },
         { id: 'ai-summarize', name: 'Summarize Note', desc: '✨ Generate AI summary', icon: 'ph-magic-wand' },
         { id: 'ai-actions', name: 'Extract Actions', desc: '✨ Find action items', icon: 'ph-check-square-offset' },
         { id: 'ai-flashcards', name: 'Flashcards', desc: '✨ Create study cards', icon: 'ph-cards' },
@@ -875,7 +887,7 @@
     },
 
     _selectSlashItem() {
-      const commands = ['h1', 'h2', 'callout', 'table', 'divider', 'ai-summarize', 'ai-actions', 'ai-flashcards', 'ai-quiz', 'ai-mindmap'];
+      const commands = ['h1', 'h2', 'callout', 'table', 'divider', 'code', 'quote', 'checklist', 'image', 'ai-summarize', 'ai-actions', 'ai-flashcards', 'ai-quiz', 'ai-mindmap'];
       const cmd = commands[this._slashIndex];
       this._hideSlashMenu();
       
@@ -903,6 +915,21 @@
         document.execCommand('insertHorizontalRule');
       } else if (cmd === 'table') {
         this._insertTable(3, 3);
+      } else if (cmd === 'code') {
+        const html = `<pre style="background:var(--bg-tertiary);border:1px solid var(--border-default);border-radius:6px;padding:12px 16px;font-family:'Fira Code',monospace;font-size:13px;overflow-x:auto;"><code>// Your code here...</code></pre><p>&nbsp;</p>`;
+        document.execCommand('insertHTML', false, html);
+      } else if (cmd === 'quote') {
+        const html = `<blockquote style="border-left:3px solid var(--accent-primary);padding:8px 16px;margin:12px 0;color:var(--text-secondary);font-style:italic;">Write your quote here...</blockquote><p>&nbsp;</p>`;
+        document.execCommand('insertHTML', false, html);
+      } else if (cmd === 'checklist') {
+        const html = `<ul style="list-style:none;padding-left:4px;"><li><input type="checkbox" style="margin-right:8px;"> Task item 1</li><li><input type="checkbox" style="margin-right:8px;"> Task item 2</li><li><input type="checkbox" style="margin-right:8px;"> Task item 3</li></ul><p>&nbsp;</p>`;
+        document.execCommand('insertHTML', false, html);
+      } else if (cmd === 'image') {
+        const url = prompt('Enter image URL:');
+        if (url) {
+          const html = `<img src="${url}" alt="User image" style="max-width:100%;border-radius:8px;margin:8px 0;"><p>&nbsp;</p>`;
+          document.execCommand('insertHTML', false, html);
+        }
       } else if (cmd === 'callout') {
         const html = `
           <div class="pro-callout" contenteditable="false">

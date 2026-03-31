@@ -300,11 +300,15 @@
        }
 
        if (action === 'DELETE_NOTE' && currentId) {
-          window.Store.deleteNote(currentId);
-          window.Editor.close();
-          window.NoteList.render();
-          window.Sidebar.renderFolders();
-          window.showToast('🤖 AI deleted note', 'danger');
+          if (window.showConfirm) {
+             window.showConfirm('🤖 AI wants to delete this note', 'This action cannot be undone. The AI agent requested deletion.', () => {
+                window.Store.deleteNote(currentId);
+                window.Editor.close();
+                window.NoteList.render();
+                window.Sidebar.renderFolders();
+                window.showToast('🤖 AI deleted note', 'danger');
+             });
+          }
           return;
        }
 
@@ -394,7 +398,31 @@
                 window.showToast('🤖 Could not find target text to format', 'warning');
              }
           }
-       } else if (action === 'REPLACE_ALL') {
+       } else if (action === 'TRANSLATE_TEXT') {
+          // Find the target text and replace it with the translated version
+          const { targetText } = payload;
+          if (targetText && text && window.find) {
+             body.focus();
+             const rng = document.createRange();
+             rng.selectNodeContents(body);
+             rng.collapse(true);
+             const sel = document.getSelection();
+             sel.removeAllRanges();
+             sel.addRange(rng);
+             const found = window.find(targetText, false, false, false, false, false, false);
+             if (found) {
+                const currentSel = window.getSelection();
+                if (currentSel.rangeCount > 0 && body.contains(currentSel.anchorNode)) {
+                   document.execCommand('insertText', false, text);
+                   window.Editor._scheduleAutoSave();
+                } else {
+                   window.showToast('🤖 Target text found outside editor', 'warning');
+                }
+             } else {
+                window.showToast('🤖 Could not find text to translate', 'warning');
+             }
+          }
+       } else if (action === 'REPLACE_ALL' || action === 'FIX_GRAMMAR') {
           let cleanHtml = parsedHtml
              .replace(/\[METADATA:[^\]]*\]\s*/gi, '')
              .replace(/(<br\s*\/?\s*>(\s*)){3,}/gi, '<br><br>')
@@ -408,7 +436,7 @@
           rangeObj.selectNodeContents(body);
           document.getSelection().addRange(rangeObj);
           document.execCommand('insertHTML', false, cleanHtml);
-       } else if (action === 'APPEND_BOTTOM' || action === 'INSERT_IMAGE' || action === 'GENERATE_TABLE') {
+       } else if (action === 'APPEND_BOTTOM' || action === 'INSERT_IMAGE' || action === 'GENERATE_TABLE' || action === 'GENERATE_LIST' || action === 'SUMMARIZE_INLINE') {
           const rangeObj = document.createRange();
           rangeObj.selectNodeContents(body);
           rangeObj.collapse(false); // end
