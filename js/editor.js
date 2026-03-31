@@ -14,6 +14,29 @@
       this._bindTagInput();
       this._bindBody();
       this._bindActions();
+      this._initInteractions();
+    },
+
+    _initInteractions() {
+      // 🫧 Floating Bubble
+      document.addEventListener('selectionchange', () => this._handleSelectionChange());
+
+      // ⌨️ Slash Menu Navigation
+      document.addEventListener('keydown', (e) => {
+        if (this._slashVisible) {
+          if (e.key === 'ArrowDown') { e.preventDefault(); this._moveSlashSelection(1); }
+          if (e.key === 'ArrowUp') { e.preventDefault(); this._moveSlashSelection(-1); }
+          if (e.key === 'Enter') { e.preventDefault(); this._selectSlashItem(); }
+          if (e.key === 'Escape') { this._hideSlashMenu(); }
+        }
+      });
+
+      // Close menus on click outside
+      document.addEventListener('mousedown', (e) => {
+        if (this._slashVisible && !document.getElementById('slash-menu').contains(e.target)) {
+          this._hideSlashMenu();
+        }
+      });
     },
 
     open(noteId) {
@@ -24,6 +47,13 @@
       // Show editor, hide empty state
       document.getElementById('editor-active').style.display = 'flex';
       document.getElementById('editor-empty-state').style.display = 'none';
+
+      // ✅ NEW: Apply Note-Specific Theme & Layout
+      const panel = document.querySelector('.editor-panel');
+      if (panel) {
+        panel.setAttribute('data-note-theme', note.theme || 'default');
+        panel.classList.toggle('full-width', !!note.isFullWidth);
+      }
 
       // Fill fields - ✅ SECURITY: Sanitize HTML content
       document.getElementById('editor-title').value = note.title || '';
@@ -59,8 +89,6 @@
           if (cmd === 'createLink') {
             const url = prompt('Enter URL:');
             if (url) document.execCommand(cmd, false, url);
-          } else if (cmd === 'formatBlock') {
-            document.execCommand(cmd, false, val);
           } else {
             document.execCommand(cmd, false, val);
           }
@@ -82,6 +110,37 @@
           }
           e.target.value = '';
           document.getElementById('editor-body').focus();
+        });
+      }
+
+      // 🎨 Color Pickers
+      const textColorBtn = document.getElementById('text-color-btn');
+      const textColorInput = document.getElementById('text-color-input');
+      if (textColorBtn && textColorInput) {
+        textColorBtn.addEventListener('click', () => textColorInput.click());
+        textColorInput.addEventListener('input', (e) => {
+          document.execCommand('foreColor', false, e.target.value);
+          this._scheduleAutoSave();
+        });
+      }
+
+      const bgColorBtn = document.getElementById('bg-color-btn');
+      const bgColorInput = document.getElementById('bg-color-input');
+      if (bgColorBtn && bgColorInput) {
+        bgColorBtn.addEventListener('click', () => bgColorInput.click());
+        bgColorInput.addEventListener('input', (e) => {
+          document.execCommand('hiliteColor', false, e.target.value);
+          this._scheduleAutoSave();
+        });
+      }
+
+      // 📊 Table Insertion
+      const tableBtn = document.getElementById('insert-table-btn');
+      if (tableBtn) {
+        tableBtn.addEventListener('click', () => {
+          const rows = prompt('Number of rows:', '3') || 3;
+          const cols = prompt('Number of columns:', '3') || 3;
+          this._insertTable(parseInt(rows), parseInt(cols));
         });
       }
 
@@ -150,9 +209,10 @@
     _bindBody() {
       const body = document.getElementById('editor-body');
       if (body) {
-        body.addEventListener('input', () => {
+        body.addEventListener('input', (e) => {
           this._scheduleAutoSave();
           this._updateStats();
+          this._handleSlashTrigger(e);
         });
 
         body.addEventListener('keydown', (e) => {
@@ -173,6 +233,7 @@
           if (e.key === ' ' || e.key === 'Enter') {
             this._handleMarkdownShortcuts(e);
           }
+          this._updateToolbarState();
         });
 
         body.addEventListener('paste', (e) => {
@@ -183,7 +244,6 @@
         });
 
         body.addEventListener('mouseup', () => this._updateToolbarState());
-        body.addEventListener('keyup', () => this._updateToolbarState());
       }
     },
 
@@ -246,6 +306,27 @@
         });
       }
 
+      // ↔️ Full Width Toggle
+      const fullWidthBtn = document.getElementById('full-width-btn');
+      if (fullWidthBtn) {
+        fullWidthBtn.addEventListener('click', () => {
+          if (!currentNoteId) return;
+          const panel = document.querySelector('.editor-panel');
+          const isFull = panel.classList.toggle('full-width');
+          window.Store.updateNote(currentNoteId, { isFullWidth: isFull });
+          window.showToast(isFull ? 'Layout expanded' : 'Focus mode active', 'info');
+        });
+      }
+
+      // 🌈 Theme Picker
+      const themeBtn = document.getElementById('theme-picker-btn');
+      if (themeBtn) {
+        themeBtn.addEventListener('click', () => {
+          if (!currentNoteId) return;
+          this._showThemePicker();
+        });
+      }
+
       // Mobile back
       const backBtn = document.getElementById('mobile-back-btn');
       if (backBtn) {
@@ -253,7 +334,152 @@
           this.close();
         });
       }
+
+      // Bubble buttons
+      document.querySelectorAll('.bubble-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const cmd = btn.dataset.command;
+          const val = btn.dataset.value || null;
+          if (cmd === 'createLink') {
+            const url = prompt('Enter URL:');
+            if (url) document.execCommand(cmd, false, url);
+          } else {
+            document.execCommand(cmd, false, val);
+          }
+          this._scheduleAutoSave();
+          this._updateToolbarState();
+        });
+      });
     },
+
+    /* ── Pro Interaction Controllers ── */
+
+    _handleSelectionChange() {
+      const selection = window.getSelection();
+      const bubble = document.getElementById('floating-bubble');
+      
+      if (!selection.isCollapsed && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const body = document.getElementById('editor-body');
+        
+        if (body.contains(range.commonAncestorContainer)) {
+          const rect = range.getBoundingClientRect();
+          bubble.style.display = 'flex';
+          bubble.style.left = `${rect.left + rect.width / 2}px`;
+          bubble.style.top = `${rect.top + window.scrollY}px`;
+          return;
+        }
+      }
+      bubble.style.display = 'none';
+    },
+
+    _handleSlashTrigger(e) {
+      const selection = window.getSelection();
+      if (selection.rangeCount === 0) return;
+
+      const range = selection.getRangeAt(0);
+      const text = range.startContainer.textContent || '';
+      const offset = range.startOffset;
+      const lastChar = text[offset - 1];
+
+      if (lastChar === '/') {
+        this._showSlashMenu(range);
+      } else if (this._slashVisible) {
+        // Simple search logic could go here
+      }
+    },
+
+    _showSlashMenu(range) {
+      const menu = document.getElementById('slash-menu');
+      const rect = range.getBoundingClientRect();
+
+      this._slashVisible = true;
+      this._slashIndex = 0;
+      this._slashRange = range.cloneRange();
+
+      menu.style.display = 'block';
+      menu.style.left = `${rect.left}px`;
+      menu.style.top = `${rect.top + 24 + window.scrollY}px`;
+
+      this._renderSlashItems();
+    },
+
+    _renderSlashItems() {
+      const commands = [
+        { id: 'h1', name: 'Heading 1', desc: 'Big section heading', icon: 'ph-text-h-one' },
+        { id: 'h2', name: 'Heading 2', desc: 'Medium section heading', icon: 'ph-text-h-two' },
+        { id: 'callout', name: 'Callout', desc: 'Info box for key notes', icon: 'ph-info' },
+        { id: 'table', name: 'Table', desc: '3x3 Data grid', icon: 'ph-table' },
+        { id: 'divider', name: 'Divider', desc: 'Visual separator', icon: 'ph-minus' },
+      ];
+
+      const container = document.getElementById('slash-menu-items');
+      container.innerHTML = commands.map((c, i) => `
+        <div class="slash-item ${i === this._slashIndex ? 'selected' : ''}" data-cmd="${c.id}">
+          <div class="slash-item-icon"><i class="ph-bold ${c.icon}"></i></div>
+          <div class="slash-item-content">
+            <div class="slash-item-name">${c.name}</div>
+            <div class="slash-item-desc">${c.desc}</div>
+          </div>
+        </div>
+      `).join('');
+
+      container.querySelectorAll('.slash-item').forEach((el, i) => {
+        el.onmousedown = (e) => {
+          e.preventDefault();
+          this._slashIndex = i;
+          this._selectSlashItem();
+        };
+      });
+    },
+
+    _moveSlashSelection(dir) {
+      const items = document.querySelectorAll('.slash-item');
+      if (!items.length) return;
+      this._slashIndex = (this._slashIndex + dir + items.length) % items.length;
+      this._renderSlashItems();
+    },
+
+    _selectSlashItem() {
+      const commands = ['h1', 'h2', 'callout', 'table', 'divider'];
+      const cmd = commands[this._slashIndex];
+      this._hideSlashMenu();
+      
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(this._slashRange);
+      document.execCommand('delete', false);
+      
+      this._executeSlashCommand(cmd);
+    },
+
+    _executeSlashCommand(cmd) {
+      if (cmd === 'h1' || cmd === 'h2') {
+        document.execCommand('formatBlock', false, cmd);
+      } else if (cmd === 'divider') {
+        document.execCommand('insertHorizontalRule');
+      } else if (cmd === 'table') {
+        this._insertTable(3, 3);
+      } else if (cmd === 'callout') {
+        const html = `
+          <div class="pro-callout" contenteditable="false">
+            <div class="pro-callout-icon"><i class="ph-fill ph-info"></i></div>
+            <div class="pro-callout-content" contenteditable="true">Write your important note here...</div>
+          </div><p>&nbsp;</p>
+        `;
+        document.execCommand('insertHTML', false, html);
+      }
+      this._scheduleAutoSave();
+    },
+
+    _hideSlashMenu() {
+      this._slashVisible = false;
+      const menu = document.getElementById('slash-menu');
+      if (menu) menu.style.display = 'none';
+    },
+
+    /* ── Core Editor Helpers ── */
 
     _scheduleAutoSave() {
       this._setSaved(false);
@@ -267,7 +493,6 @@
       const content = document.getElementById('editor-body')?.innerHTML || '';
       window.Store.updateNote(currentNoteId, { title, content });
       this._setSaved(true);
-      // Targeted card update — no full list re-render to avoid flicker
       window.NoteList.updateCard(currentNoteId);
     },
 
@@ -275,12 +500,8 @@
       isSaved = saved;
       const dot = document.querySelector('.save-dot');
       const label = document.getElementById('save-status-label');
-      if (dot) {
-        dot.classList.toggle('unsaved', !saved);
-      }
-      if (label) {
-        label.textContent = saved ? 'Saved' : 'Saving...';
-      }
+      if (dot) dot.classList.toggle('unsaved', !saved);
+      if (label) label.textContent = saved ? 'Saved' : 'Saving...';
     },
 
     _updateStats() {
@@ -289,10 +510,8 @@
       const text = body.innerText || '';
       const words = text.trim() ? text.trim().split(/\s+/).length : 0;
       const chars = text.length;
-      const wordEl = document.getElementById('word-count');
-      const charEl = document.getElementById('char-count');
-      if (wordEl) wordEl.textContent = `${words} words`;
-      if (charEl) charEl.textContent = `${chars} chars`;
+      document.getElementById('word-count').textContent = `${words} words`;
+      document.getElementById('char-count').textContent = `${chars} chars`;
     },
 
     _renderTags(tags) {
@@ -306,7 +525,6 @@
         </span>
       `).join('');
 
-      // Bind remove buttons
       container.querySelectorAll('.tag-remove').forEach(btn => {
         btn.addEventListener('click', () => {
           const tagName = btn.dataset.tag;
@@ -326,9 +544,7 @@
       const btn = document.getElementById('pin-btn');
       if (btn) {
         btn.classList.toggle('pinned', pinned);
-        btn.title = pinned ? 'Unpin note' : 'Pin note';
         btn.innerHTML = pinned ? '<i class="ph-fill ph-push-pin" style="font-size:18px;"></i>' : '<i class="ph-bold ph-push-pin" style="font-size:18px;"></i>';
-        window.AppIcons.render();
       }
     },
 
@@ -336,155 +552,103 @@
       document.querySelectorAll('[data-command]').forEach(btn => {
         const cmd = btn.dataset.command;
         try {
-          if (['bold', 'italic', 'underline', 'strikeThrough', 'insertOrderedList', 'insertUnorderedList'].includes(cmd)) {
+          if (['bold', 'italic', 'underline', 'strikeThrough'].includes(cmd)) {
             btn.classList.toggle('active', document.queryCommandState(cmd));
           }
-        } catch { /* ignore */ }
+        } catch { }
       });
     },
 
     _handleMarkdownShortcuts(e) {
       const selection = window.getSelection();
       if (!selection.rangeCount) return;
-      
       const range = selection.getRangeAt(0);
       const container = range.startContainer;
-      
-      // We only care about text nodes
       if (container.nodeType !== Node.TEXT_NODE) return;
-      
       const text = container.textContent;
-      const cursorPosition = range.startOffset;
-      
-      // Check the text before the cursor
-      const textBeforeCursor = text.substring(0, cursorPosition);
+      const pos = range.startOffset;
+      const textBefore = text.substring(0, pos);
       
       const shortcuts = [
-        { pattern: /^#\s$/, command: 'formatBlock', value: 'h1' },
-        { pattern: /^##\s$/, command: 'formatBlock', value: 'h2' },
-        { pattern: /^###\s$/, command: 'formatBlock', value: 'h3' },
-        { pattern: /^-\s$/, command: 'insertUnorderedList', value: null },
-        { pattern: /^\*\s$/, command: 'insertUnorderedList', value: null },
-        { pattern: /^1\.\s$/, command: 'insertOrderedList', value: null },
-        { pattern: /^>\s$/, command: 'formatBlock', value: 'blockquote' },
+        { pattern: /^#\s$/, cmd: 'h1' },
+        { pattern: /^##\s$/, cmd: 'h2' },
+        { pattern: /^>\s$/, cmd: 'blockquote' },
       ];
 
-      for (const { pattern, command, value } of shortcuts) {
-        if (pattern.test(textBeforeCursor)) {
-          // Prevent the space from being typed if we're transforming
-          // Actually, since this is on keyup, the space is already there.
-          // We need to remove the shortcut prefix.
-          
-          const match = textBeforeCursor.match(pattern);
-          const matchLength = match[0].length;
-          
-          // Remove the characters
-          range.setStart(container, cursorPosition - matchLength);
-          range.setEnd(container, cursorPosition);
+      for (const s of shortcuts) {
+        if (s.pattern.test(textBefore)) {
+          const match = textBefore.match(s.pattern);
+          range.setStart(container, pos - match[0].length);
+          range.setEnd(container, pos);
           range.deleteContents();
-          
-          // Execute command
-          document.execCommand(command, false, value);
-          
-          this._scheduleAutoSave();
-          this._updateToolbarState();
+          document.execCommand(s.cmd === 'blockquote' ? 'formatBlock' : 'formatBlock', false, s.cmd);
           break;
         }
       }
     },
 
-    // ✅ Share note: Show share modal with link generation
     async _showShareModal(noteId, noteTitle) {
       const html = `
-        <div style="text-align: center; margin-bottom: var(--space-lg);">
-          <i class="ph-duotone ph-link" style="font-size: 48px; color: var(--accent-primary);"></i>
-        </div>
-        <h3 style="text-align: center; margin-bottom: var(--space-sm);">Share Note</h3>
-        <p style="text-align: center; color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-lg);">
-          Create a shareable link. Anyone with the link can <strong>view</strong> this note (read-only).
-        </p>
-
-        <button class="btn btn-primary" id="modal-create-share" style="width: 100%; justify-content: center;">
-          <i class="ph-bold ph-link"></i> Create Share Link
-        </button>
-
-        <div id="share-result" style="display: none; margin-top: var(--space-lg); padding: var(--space-md); background: var(--bg-tertiary); border-radius: var(--radius-sm);">
-          <p style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-bottom: var(--space-xs);">Share Link:</p>
-          <div style="display: flex; gap: var(--space-sm);">
-            <input type="text" id="share-link-input" readonly style="flex: 1; padding: var(--space-sm); border-radius: var(--radius-sm); border: 1px solid var(--border-default); background: var(--bg-primary); color: var(--text-primary); font-size: var(--font-size-xs);" />
-            <button class="btn btn-secondary" id="modal-copy-link" style="padding: var(--space-sm) var(--space-md);">
-              <i class="ph-bold ph-copy"></i>
-            </button>
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h3 style="margin-bottom: 8px;">Share Note</h3>
+          <p style="color: var(--text-tertiary); font-size: 14px;">Create a read-only link for others.</p>
+          <button class="btn btn-primary" id="modal-create-share" style="width: 100%; margin-top: 16px;">Create Link</button>
+          <div id="share-result" style="display:none; margin-top: 16px;">
+            <input type="text" id="share-link-input" readonly style="width:100%; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); font-size: 12px;"/>
           </div>
-          <p style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: var(--space-sm);">
-            <i class="ph-duotone ph-eye"></i> This is a read-only view. Recipients cannot edit or delete the note.
-          </p>
         </div>
       `;
-
       window.showModal(html);
-
-      // Create share link handler
-      const createBtn = document.getElementById('modal-create-share');
-      createBtn.addEventListener('click', async () => {
-        createBtn.disabled = true;
-        createBtn.innerHTML = '<i class="ph-bold ph-spinner" style="animation: spin 1s linear infinite;"></i> Creating...';
-
+      const btn = document.getElementById('modal-create-share');
+      btn.onclick = async () => {
+        btn.disabled = true;
+        btn.innerText = 'Creating...';
         try {
-          const token = window.Auth.getToken();
-          const note = window.Store.getNote(noteId);
           const res = await fetch(`${window.API_BASE_URL}/share/${noteId}`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              title: note?.title || '',
-              content: note?.content || '',
-              tags: note?.tags || []
-            })
+            headers: { 'Authorization': `Bearer ${window.Auth.getToken()}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: noteTitle, content: document.getElementById('editor-body').innerHTML })
           });
-
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.msg || 'Failed to create share link');
-          }
-
           const data = await res.json();
-
-          // Show link result
           document.getElementById('share-result').style.display = 'block';
-          document.getElementById('modal-create-share').style.display = 'none';
+          document.getElementById('share-link-input').value = data.url;
+        } catch (e) { window.showToast('Failed to share', 'danger'); }
+      };
+    },
 
-          const shareUrl = data.url;
-          document.getElementById('share-link-input').value = shareUrl;
-
-          // Copy to clipboard button
-          document.getElementById('modal-copy-link').addEventListener('click', () => {
-            const linkInput = document.getElementById('share-link-input');
-            // Use modern Clipboard API with fallback
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(shareUrl).then(() => {
-                window.showToast('📋 Link copied to clipboard!', 'success');
-              }).catch(() => {
-                // Fallback
-                linkInput.select();
-                document.execCommand('copy');
-                window.showToast('📋 Link copied to clipboard!', 'success');
-              });
-            } else {
-              linkInput.select();
-              document.execCommand('copy');
-              window.showToast('📋 Link copied to clipboard!', 'success');
-            }
-          });
-        } catch (err) {
-          window.showToast('Error creating share link: ' + err.message, 'danger');
-          createBtn.disabled = false;
-          createBtn.innerHTML = '<i class="ph-bold ph-link"></i> Create Share Link';
-        }
+    _showThemePicker() {
+      const themes = ['default', 'sepia', 'midnight', 'cyberpunk', 'solarized'];
+      const html = `
+        <div style="padding: 20px;">
+          <h3 style="margin-bottom: 16px;">Themes</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            ${themes.map(t => `<button class="btn btn-secondary theme-option" data-theme="${t}">${t}</button>`).join('')}
+          </div>
+        </div>
+      `;
+      window.showModal(html);
+      document.querySelectorAll('.theme-option').forEach(btn => {
+        btn.onclick = () => {
+          const theme = btn.dataset.theme;
+          document.querySelector('.editor-panel').setAttribute('data-note-theme', theme);
+          window.Store.updateNote(currentNoteId, { theme });
+          window.closeModal();
+        };
       });
     },
+
+    _insertTable(rows, cols) {
+      let html = '<table style="width:100%; border-collapse:collapse; margin: 12px 0;">';
+      for (let i = 0; i < rows; i++) {
+        html += '<tr>';
+        for (let j = 0; j < cols; j++) {
+          html += '<td style="border:1px solid var(--border-default); padding:10px;">&nbsp;</td>';
+        }
+        html += '</tr>';
+      }
+      html += '</table><p>&nbsp;</p>';
+      document.getElementById('editor-body').focus();
+      document.execCommand('insertHTML', false, html);
+    }
   };
 })();

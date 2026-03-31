@@ -171,6 +171,12 @@
             <button class="mobile-back-btn" id="mobile-back-btn" aria-label="Back to list"><i class="ph-bold ph-arrow-left" style="font-size:20px;"></i></button>
           </div>
           <div class="editor-header-actions">
+            <!-- Layout Toggles -->
+            <button class="editor-action-btn" id="full-width-btn" title="Toggle Full Width" aria-label="Toggle Full Width"><i class="ph-bold ph-arrows-out" style="font-size:18px;"></i></button>
+            <button class="editor-action-btn" id="theme-picker-btn" title="Note Theme" aria-label="Note Theme"><i class="ph-bold ph-palette" style="font-size:18px;"></i></button>
+            
+            <div class="toolbar-divider" style="height: 20px; margin: 0 8px;"></div>
+
             <button class="editor-action-btn" id="copy-btn" title="Copy to clipboard" aria-label="Copy to clipboard"><i class="ph-bold ph-copy" style="font-size:18px;"></i></button>
             <button class="editor-action-btn" id="share-btn" title="Share note" aria-label="Share note"><i class="ph-bold ph-share-network" style="font-size:18px;"></i></button>
             <button class="editor-action-btn" id="pin-btn" title="Pin note" aria-label="Pin note"><i class="ph-bold ph-push-pin" style="font-size:18px;"></i></button>
@@ -180,6 +186,11 @@
 
         <!-- Toolbar -->
         <div class="editor-toolbar" role="toolbar" aria-label="Formatting options">
+          <!-- Undo/Redo -->
+          <button class="toolbar-btn" data-command="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><i class="ph-bold ph-arrow-u-up-left" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="redo" title="Redo (Ctrl+Y)" aria-label="Redo"><i class="ph-bold ph-arrow-u-up-right" style="font-size: 16px;"></i></button>
+          <div class="toolbar-divider"></div>
+
           <select class="toolbar-select" id="heading-select" title="Heading level" aria-label="Select heading level">
             <option value="">Text Level</option>
             <option value="h1">Heading 1</option>
@@ -188,19 +199,47 @@
             <option value="p">Paragraph</option>
           </select>
           <div class="toolbar-divider"></div>
+
+          <!-- Basic Format -->
           <button class="toolbar-btn" data-command="bold" title="Bold (Ctrl+B)" aria-label="Bold"><i class="ph-bold ph-text-b" style="font-size: 16px;"></i></button>
           <button class="toolbar-btn" data-command="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i class="ph-bold ph-text-italic" style="font-size: 16px;"></i></button>
           <button class="toolbar-btn" data-command="underline" title="Underline (Ctrl+U)" aria-label="Underline"><i class="ph-bold ph-text-underline" style="font-size: 16px;"></i></button>
           <button class="toolbar-btn" data-command="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><i class="ph-bold ph-text-strikethrough" style="font-size: 16px;"></i></button>
+          
           <div class="toolbar-divider"></div>
+
+          <!-- Alignment -->
+          <button class="toolbar-btn" data-command="justifyLeft" title="Align Left" aria-label="Align Left"><i class="ph-bold ph-text-align-left" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="justifyCenter" title="Align Center" aria-label="Align Center"><i class="ph-bold ph-text-align-center" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="justifyRight" title="Align Right" aria-label="Align Right"><i class="ph-bold ph-text-align-right" style="font-size: 16px;"></i></button>
+          
+          <div class="toolbar-divider"></div>
+
+          <!-- Color Lookups -->
+          <button class="toolbar-btn" id="text-color-btn" title="Text Color" aria-label="Text Color"><i class="ph-bold ph-palette" style="font-size: 16px; color: var(--accent-primary);"></i></button>
+          <button class="toolbar-btn" id="bg-color-btn" title="Highlight Color" aria-label="Highlight Color"><i class="ph-bold ph-highlighter-circle" style="font-size: 16px; color: var(--accent-warning);"></i></button>
+          <input type="color" id="text-color-input" style="display: none;" />
+          <input type="color" id="bg-color-input" style="display: none;" />
+
+          <div class="toolbar-divider"></div>
+
+          <!-- Lists & Blocks -->
           <button class="toolbar-btn" data-command="insertUnorderedList" title="Bullet list" aria-label="Bullet list"><i class="ph-bold ph-list-bullets" style="font-size: 16px;"></i></button>
           <button class="toolbar-btn" data-command="insertOrderedList" title="Numbered list" aria-label="Numbered list"><i class="ph-bold ph-list-numbers" style="font-size: 16px;"></i></button>
           <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Quote" aria-label="Quote"><i class="ph-bold ph-quotes" style="font-size: 16px;"></i></button>
           <button class="toolbar-btn" data-command="formatBlock" data-value="pre" title="Code block" aria-label="Code block"><i class="ph-bold ph-code" style="font-size: 16px;"></i></button>
+          
           <div class="toolbar-divider"></div>
+
+          <!-- Inserts -->
           <button class="toolbar-btn" data-command="createLink" title="Insert link" aria-label="Insert link"><i class="ph-bold ph-link" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" id="insert-table-btn" title="Insert table" aria-label="Insert table"><i class="ph-bold ph-table" style="font-size: 16px;"></i></button>
           <button class="toolbar-btn" id="insert-image-btn" title="Insert image" aria-label="Insert image"><i class="ph-bold ph-image" style="font-size: 16px;"></i></button>
           <input type="file" id="image-upload-input" accept="image/*" style="display: none;" aria-hidden="true" />
+          
+          <div class="toolbar-divider"></div>
+
+          <!-- Utilities -->
           <button class="toolbar-btn" data-command="insertHorizontalRule" title="Horizontal rule" aria-label="Insert horizontal rule"><i class="ph-bold ph-minus" style="font-size: 16px;"></i></button>
           <button class="toolbar-btn" data-command="removeFormat" title="Clear formatting" aria-label="Clear formatting"><i class="ph-bold ph-eraser" style="font-size: 16px;"></i></button>
         </div>
@@ -231,17 +270,32 @@
         </div>
 
         <!-- Content -->
-        <div class="editor-body-wrapper">
-            <div
-              id="editor-body"
-              class="editor-body"
-              contenteditable="true"
-              spellcheck="true"
-              role="textbox"
-              aria-multiline="true"
-              aria-label="Note content editable area"
-              data-placeholder="Start writing your thoughts..."
-            ></div>
+        <div class="editor-body-wrapper" id="editor-body-wrapper">
+          <!-- Selection Floating Bubble -->
+          <div id="floating-bubble" class="floating-bubble" style="display: none;">
+            <button class="bubble-btn" data-command="bold" title="Bold"><i class="ph ph-text-b"></i></button>
+            <button class="bubble-btn" data-command="italic" title="Italic"><i class="ph ph-text-italic"></i></button>
+            <button class="bubble-btn" data-command="createLink" title="Link"><i class="ph ph-link"></i></button>
+            <div class="bubble-divider"></div>
+            <button class="bubble-btn" data-command="formatBlock" data-value="blockquote" title="Quote"><i class="ph ph-quotes"></i></button>
+          </div>
+
+          <!-- Slash Command Menu -->
+          <div id="slash-menu" class="slash-menu" style="display:none;">
+            <div class="slash-menu-title">Commands</div>
+            <div id="slash-menu-items"></div>
+          </div>
+
+          <div
+            id="editor-body"
+            class="editor-body"
+            contenteditable="true"
+            spellcheck="true"
+            role="textbox"
+            aria-multiline="true"
+            aria-label="Note content editable area"
+            data-placeholder="Start typing or press '/' for commands..."
+          ></div>
         </div>
 
         <!-- Footer -->

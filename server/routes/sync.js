@@ -37,6 +37,8 @@ router.get('/', auth, async (req, res) => {
       folderId: n.folderId,
       tags: n.tags,
       pinned: n.pinned,
+      theme: n.theme || 'default',
+      isFullWidth: n.isFullWidth || false,
       updatedAt: n.clientUpdatedAt,
     }));
 
@@ -120,6 +122,8 @@ router.post('/', auth, async (req, res) => {
             folderId: n.folderId,
             tags: n.tags,
             pinned: n.pinned,
+            theme: n.theme || 'default',
+            isFullWidth: n.isFullWidth || false,
             clientUpdatedAt: n.updatedAt,
           }).save();
         } else {
@@ -131,6 +135,8 @@ router.post('/', auth, async (req, res) => {
             existing.folderId = n.folderId;
             existing.tags = n.tags;
             existing.pinned = n.pinned;
+            existing.theme = n.theme || 'default';
+            existing.isFullWidth = n.isFullWidth || false;
             existing.clientUpdatedAt = clientDate;
             await existing.save();
           }

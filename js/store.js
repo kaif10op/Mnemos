@@ -64,6 +64,8 @@ function createNote(folderId = null) {
     folderId: folderId,
     tags: [],
     pinned: false,
+    theme: 'default',
+    isFullWidth: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -566,7 +568,7 @@ window.Store = {
 /* ── Data Fingerprint Helper ── */
 
 function _buildDataFingerprint(notes, folders) {
-  const notesPart = notes.map(n => `${n.id}:${n.updatedAt}`).sort().join(',');
+  const notesPart = notes.map(n => `${n.id}:${n.updatedAt}:${n.theme}:${n.isFullWidth}`).sort().join(',');
   const foldersPart = folders.map(f => `${f.id}:${f.name}`).sort().join(',');
   return `N[${notesPart}]F[${foldersPart}]`;
 }

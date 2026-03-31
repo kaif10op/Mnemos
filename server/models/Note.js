@@ -35,6 +35,15 @@ const NoteSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // ✅ NEW: Premium Editor Preferences
+  theme: {
+    type: String,
+    default: 'default', // sepia, cyberpunk, solarized, midnight
+  },
+  isFullWidth: {
+    type: Boolean,
+    default: false,
+  },
 }, { timestamps: true });
 
 // Add clientId field
