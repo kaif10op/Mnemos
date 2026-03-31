@@ -30,6 +30,7 @@ app.get('/health', (req, res) => {
 });
 
 // Connect Database
+let gfs, gridfsBucket;
 const connectDB = async () => {
   try {
     let mongoUri = process.env.MONGO_URI;
@@ -45,8 +46,15 @@ const connectDB = async () => {
       logger.info('Using MongoDB URI from .env');
     }
 
-    await mongoose.connect(mongoUri);
+    const conn = await mongoose.connect(mongoUri);
     logger.info('MongoDB Connected');
+
+    // Init GridFS
+    gridfsBucket = new mongoose.mongo.GridFSBucket(conn.connection.db, {
+      bucketName: 'uploads'
+    });
+    app.set('gridfsBucket', gridfsBucket);
+    logger.info('GridFS Bucket initialized');
   } catch (err) {
     logger.error('Database connection failed', { error: err.message });
     process.exit(1);

@@ -64,11 +64,16 @@
       // Fill fields - ✅ SECURITY: Sanitize HTML content
       document.getElementById('editor-title').value = note.title || '';
       
-      // ✅ IMAGE REPAIR: Prepend backend origin if it's a relative /uploads path
+      // ✅ IMAGE REPAIR: Prepend backend origin if it's a relative path
       let content = note.content || '';
       const baseUrl = window.API_BASE_URL.replace('/api', '');
+      
+      // Fix both legacy /uploads and new /api/sync/image paths
       if (content.includes('src="/uploads/')) {
         content = content.replaceAll('src="/uploads/', `src="${baseUrl}/uploads/`);
+      }
+      if (content.includes('src="/api/sync/image/')) {
+        content = content.replaceAll('src="/api/sync/image/', `src="${baseUrl}/api/sync/image/`);
       }
 
       document.getElementById('editor-body').innerHTML = DOMPurify.sanitize(content);
@@ -217,13 +222,13 @@
               if (!res.ok) throw new Error('Upload failed');
               const data = await res.json();
               
-              // ✅ FIXED: Standardized absolute path for images
+              // ✅ FIXED: Standardized absolute path for GridFS images
               const baseUrl = window.API_BASE_URL.replace('/api', '');
-              const fullUrl = `${baseUrl}${data.url}`;
+              const fullUrl = data.url.startsWith('http') ? data.url : `${baseUrl}${data.url}`;
               
               document.execCommand('insertImage', false, fullUrl);
               this._scheduleAutoSave();
-              window.showToast('🖼️ Image uploaded successfully', 'success');
+              window.showToast('🖼️ Image uploaded to cloud', 'success');
             } catch (err) {
               window.showToast('Upload failed: ' + err.message, 'danger');
             }

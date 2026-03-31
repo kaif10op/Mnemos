@@ -7,21 +7,38 @@ const cache = require('../utils/cache');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
-// Configure Multer Storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'img-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+const { Readable } = require('stream');
+
+// Use Memory Storage for maximum control and performance
+const storage = multer.memoryStorage();
 
 const upload = multer({ 
-  storage: storage,
+  storage,
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB per image
+});
+
+// @route   GET api/sync/image/:filename
+// @desc    Stream an image from GridFS
+// @access  Public
+router.get('/image/:filename', async (req, res) => {
+  try {
+    const bucket = req.app.get('gridfsBucket');
+    if (!bucket) return res.status(500).json({ msg: 'Database storage not initialized' });
+
+    const files = await bucket.find({ filename: req.params.filename }).toArray();
+    if (!files || files.length === 0) {
+      return res.status(404).json({ msg: 'Image not found' });
+    }
+
+    // Set content type and stream
+    res.set('Content-Type', files[0].contentType);
+    res.set('Cache-Control', 'public, max-age=31536000'); // 1 year cache
+    bucket.openDownloadStreamByName(req.params.filename).pipe(res);
+  } catch (err) {
+    res.status(500).json({ msg: 'Server Error' });
+  }
 });
 
 // @route   POST api/sync/upload
@@ -31,12 +48,38 @@ router.post('/upload', auth, upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ msg: 'No file uploaded' });
   }
-  
-  // Return the public URL
-  // We assume the server is running on the same domain or we have a base URL.
-  // Using a relative path for flexibility.
-  const imageUrl = `/uploads/${req.file.filename}`;
-  res.json({ url: imageUrl });
+
+  try {
+    const bucket = req.app.get('gridfsBucket');
+    if (!bucket) throw new Error('GridFS Bucket not initialized');
+
+    // Generate professional random filename
+    const filename = crypto.randomBytes(16).toString('hex') + path.extname(req.file.originalname);
+    
+    // Create an upload stream
+    const uploadStream = bucket.openUploadStream(filename, {
+      contentType: req.file.mimetype,
+      metadata: { userId: req.user.id }
+    });
+
+    // Pipe the memory buffer to GridFS
+    const readableFileStream = new Readable();
+    readableFileStream.push(req.file.buffer);
+    readableFileStream.push(null);
+    
+    readableFileStream.pipe(uploadStream)
+      .on('error', (err) => {
+        logger.error('GridFS Upload Stream Error', { error: err.message });
+        res.status(500).json({ msg: 'Upload failed during streaming' });
+      })
+      .on('finish', () => {
+        // Return the new professional binary URL
+        const imageUrl = `/api/sync/image/${filename}`;
+        res.json({ url: imageUrl });
+      });
+  } catch (err) {
+    res.status(500).json({ msg: 'Database connection failed' });
+  }
 });
 
 // @route   GET api/sync
