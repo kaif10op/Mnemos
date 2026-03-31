@@ -628,7 +628,7 @@
       const content = document.getElementById('editor-body')?.innerHTML || '';
       window.Store.updateNote(currentNoteId, { title, content });
       this._setSaved(true);
-      window.NoteList.updateCard(currentNoteId);
+      window.NoteList.render();
     },
 
     _setSaved(saved) {
@@ -850,6 +850,8 @@
       document.querySelectorAll('.editor-body .selected').forEach(el => el.classList.remove('selected'));
       const toolbar = document.getElementById('block-toolbar');
       if (toolbar) toolbar.style.display = 'none';
+      const resizer = document.getElementById('block-resizer');
+      if (resizer) resizer.style.display = 'none';
     },
 
     _handleBlockAction(action) {
@@ -949,10 +951,15 @@
           const rect = block.getBoundingClientRect();
           dragHandle.style.display = 'flex';
           dragHandle.style.top = `${rect.top + window.scrollY}px`;
-          dragHandle.style.left = `${rect.left - 30}px`;
+          dragHandle.style.left = `${rect.left - 36}px`; /* Positioned in the 56px gutter */
           dragHandle._targetBlock = block;
+          
+          // Show a subtle hover state on the target block
+          document.querySelectorAll('.editor-body > *').forEach(el => el.style.borderLeft = 'none');
+          block.style.borderLeft = '2px solid var(--accent-primary-glow)';
         } else {
           dragHandle.style.display = 'none';
+          document.querySelectorAll('.editor-body > *').forEach(el => el.style.borderLeft = 'none');
         }
       });
 
