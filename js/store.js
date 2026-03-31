@@ -6,6 +6,8 @@ const STORAGE_KEYS = {
   NOTES: 'notesaver_notes',
   FOLDERS: 'notesaver_folders',
   SETTINGS: 'notesaver_settings',
+  DELETED_NOTES: 'notesaver_deleted_notes',
+  DELETED_FOLDERS: 'notesaver_deleted_folders',
 };
 
 const TAG_COLORS = [
@@ -35,6 +37,15 @@ function getAllNotes() {
   } catch {
     return [];
   }
+}
+
+function getDeletedNotes() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_NOTES) || '[]'); } 
+  catch { return []; }
+}
+
+function saveDeletedNotes(ids) {
+  localStorage.setItem(STORAGE_KEYS.DELETED_NOTES, JSON.stringify(ids));
 }
 
 function saveAllNotes(notes) {
@@ -78,6 +89,13 @@ function updateNote(id, updates) {
 function deleteNote(id) {
   const notes = getAllNotes().filter(n => n.id !== id);
   saveAllNotes(notes);
+
+  // Track deletion for explicit cloud sync
+  const deleted = getDeletedNotes();
+  if (!deleted.includes(id)) {
+    deleted.push(id);
+    saveDeletedNotes(deleted);
+  }
 }
 
 function togglePin(id) {
@@ -136,6 +154,15 @@ function getAllFolders() {
   }
 }
 
+function getDeletedFolders() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_FOLDERS) || '[]'); } 
+  catch { return []; }
+}
+
+function saveDeletedFolders(ids) {
+  localStorage.setItem(STORAGE_KEYS.DELETED_FOLDERS, JSON.stringify(ids));
+}
+
 function saveAllFolders(folders) {
   localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(folders));
   // ✅ NEW: Use SyncManager for smart background sync (no re-renders)
@@ -168,6 +195,13 @@ function deleteFolder(id) {
   const notes = getAllNotes();
   notes.forEach(n => { if (n.folderId === id) n.folderId = null; });
   saveAllNotes(notes);
+
+  // Track deletion for explicit cloud sync
+  const deleted = getDeletedFolders();
+  if (!deleted.includes(id)) {
+    deleted.push(id);
+    saveDeletedFolders(deleted);
+  }
 }
 
 function getNotesCountByFolder(folderId) {
@@ -317,12 +351,42 @@ async function fetchFromCloud() {
       return; // UI will be refreshed by syncWithCloud
     }
 
-    // ✅ SILENT: Write to localStorage directly (skip triggering another sync)
-    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
-    localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(folders));
+    // ✅ SILENT MERGE: Update data without wiping local offline changes
+    const deletedNoteIds = getDeletedNotes();
+    const deletedFolderIds = getDeletedFolders();
+    const serverDeletedIds = data.deletedNoteIds || [];
+
+    // Filter out notes deleted on the server
+    let activeNotes = beforeNotes.filter(n => !serverDeletedIds.includes(n.id));
+
+    // Add only new notes from cloud that we haven't deleted locally
+    notes.forEach(incoming => {
+      if (deletedNoteIds.includes(incoming.id)) return;
+      
+      const idx = activeNotes.findIndex(n => n.id === incoming.id);
+      if (idx === -1) {
+        activeNotes.push(incoming);
+      } else if (new Date(incoming.updatedAt) > new Date(activeNotes[idx].updatedAt)) {
+        activeNotes[idx] = { ...activeNotes[idx], ...incoming };
+      }
+    });
+
+    folders.forEach(incoming => {
+      if (deletedFolderIds.includes(incoming.id)) return;
+      
+      const idx = beforeFolders.findIndex(f => f.id === incoming.id);
+      if (idx === -1) {
+        beforeFolders.push(incoming);
+      } else {
+        beforeFolders[idx] = { ...beforeFolders[idx], ...incoming };
+      }
+    });
+
+    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(activeNotes));
+    localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(beforeFolders));
 
     // Only re-render UI if data actually changed
-    const afterFingerprint = _buildDataFingerprint(notes, folders);
+    const afterFingerprint = _buildDataFingerprint(activeNotes, beforeFolders);
     if (afterFingerprint !== beforeFingerprint) {
       window.Sidebar.renderFolders();
       window.Sidebar.renderTags();
@@ -347,7 +411,12 @@ async function syncWithCloud() {
 
   const notes = getAllNotes();
   const folders = getAllFolders();
+  const deletedNoteIds = getDeletedNotes();
+  const deletedFolderIds = getDeletedFolders();
   const statusEl = document.getElementById('save-status-label');
+
+  // Track initial state to detect if server returned new data that UI needs to render
+  const beforeFingerprint = _buildDataFingerprint(notes, folders);
 
   try {
     // ✅ Use retry logic for resilience
@@ -358,16 +427,52 @@ async function syncWithCloud() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ notes, folders })
+        body: JSON.stringify({ notes, folders, deletedNoteIds, deletedFolderIds })
       }),
       2 // Retry 2 times (3 total attempts)
     );
 
     const data = await res.json();
 
-    // ✅ SILENT: Write to localStorage directly without triggering re-renders or re-sync
-    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(data.notes || []));
-    localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(data.folders || []));
+    // ✅ SUCCESS: Sync finished, wipe only the explicitly processed deleted queues
+    const currentDeletedNotes = getDeletedNotes();
+    saveDeletedNotes(currentDeletedNotes.filter(id => !deletedNoteIds.includes(id)));
+
+    const currentDeletedFolders = getDeletedFolders();
+    saveDeletedFolders(currentDeletedFolders.filter(id => !deletedFolderIds.includes(id)));
+
+    // Merge any remote response seamlessly
+    const currentNotes = getAllNotes();
+    const currentFolders = getAllFolders();
+
+    (data.notes || []).forEach(incoming => {
+      const idx = currentNotes.findIndex(n => n.id === incoming.id);
+      if (idx === -1) {
+        currentNotes.push(incoming);
+      } else if (new Date(incoming.updatedAt) > new Date(currentNotes[idx].updatedAt)) {
+        currentNotes[idx] = { ...currentNotes[idx], ...incoming };
+      }
+    });
+
+    (data.folders || []).forEach(incoming => {
+      const idx = currentFolders.findIndex(f => f.id === incoming.id);
+      if (idx === -1) {
+        currentFolders.push(incoming);
+      } else {
+        currentFolders[idx] = { ...currentFolders[idx], ...incoming };
+      }
+    });
+
+    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(currentNotes));
+    localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(currentFolders));
+
+    // If the server gave us new data (like upon initial login), update the UI automatically
+    const afterFingerprint = _buildDataFingerprint(currentNotes, currentFolders);
+    if (afterFingerprint !== beforeFingerprint) {
+      if (window.Sidebar) window.Sidebar.renderFolders();
+      if (window.Sidebar) window.Sidebar.renderTags();
+      if (window.NoteList) window.NoteList.render(true);
+    }
 
     if (statusEl) statusEl.textContent = 'Saved & Synced';
     setTimeout(() => {
@@ -447,8 +552,10 @@ async function loadMoreNotes() {
 // Make store functions global
 window.Store = {
   getAllNotes, saveAllNotes, createNote, getNote, updateNote, deleteNote,
+  getDeletedNotes, saveDeletedNotes,
   togglePin, getFilteredNotes, getAllTags, getTagColor,
   getAllFolders, saveAllFolders, createFolder, updateFolder, deleteFolder, getNotesCountByFolder,
+  getDeletedFolders, saveDeletedFolders,
   getSettings, saveSetting,
   initSync, syncWithCloud, scheduleSync, fetchFromCloud,
   exportData, importData,

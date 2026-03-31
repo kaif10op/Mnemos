@@ -7,6 +7,7 @@
   let pendingChanges = { notes: new Set(), folders: new Set() };
   let isSyncing = false;
   let syncTimer = null;
+  let pollTimer = null;
   const SYNC_DEBOUNCE = 5000; // 5 seconds between syncs
 
   window.SyncManager = {
@@ -74,6 +75,8 @@
         const token = window.Auth.getToken();
         const notes = window.Store.getAllNotes();
         const folders = window.Store.getAllFolders();
+        const deletedNoteIds = window.Store.getDeletedNotes();
+        const deletedFolderIds = window.Store.getDeletedFolders();
 
         // Perform sync with retry
         const res = await window.ErrorHandler.retryWithBackoff(
@@ -83,12 +86,19 @@
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ notes, folders })
+            body: JSON.stringify({ notes, folders, deletedNoteIds, deletedFolderIds })
           }),
           2
         );
 
         const data = await res.json();
+
+        // ✅ SUCCESS: Sync finished, wipe exactly what was committed to the cloud
+        const currentDeletedNotes = window.Store.getDeletedNotes();
+        window.Store.saveDeletedNotes(currentDeletedNotes.filter(id => !deletedNoteIds.includes(id)));
+
+        const currentDeletedFolders = window.Store.getDeletedFolders();
+        window.Store.saveDeletedFolders(currentDeletedFolders.filter(id => !deletedFolderIds.includes(id)));
 
         // ✅ SILENT UPDATE: Update data without triggering re-renders
         this.silentUpdateData(data);
@@ -157,6 +167,22 @@
       window.Sidebar.renderFolders();
       window.Sidebar.renderTags();
       window.NoteList.render();
+    },
+
+    /**
+     * ✅ Activate consistent background pulling daemon
+     */
+    startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(async () => {
+        if (!isSyncing && window.Auth.getToken()) {
+          try {
+            await window.Store.fetchFromCloud();
+          } catch (e) {
+            console.error('Auto-poll error:', e);
+          }
+        }
+      }, 15000); // Poll every 15 seconds
     }
   };
 
@@ -167,6 +193,7 @@
         notes: window.Store.getAllNotes(),
         folders: window.Store.getAllFolders()
       };
+      window.SyncManager.startPolling();
     }
   });
 })();

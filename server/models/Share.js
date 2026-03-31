@@ -35,8 +35,7 @@ const ShareSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Index for fast token lookups
-ShareSchema.index({ token: 1 });
+// Index for user lookups
 ShareSchema.index({ userId: 1 });
 
 // Query helper: exclude expired shares

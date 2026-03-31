@@ -25,6 +25,10 @@ router.get('/', auth, async (req, res) => {
     const totalNotes = await Note.countDocuments({ userId, deletedAt: null });
     const allFolders = await Folder.find({ userId });
 
+    // Extract soft-deleted IDs for offline sync resolution
+    const trashedNotes = await Note.find({ userId, deletedAt: { $ne: null } }).select('clientId');
+    const deletedNoteIds = trashedNotes.map(n => n.clientId);
+
     // Map back to client format
     const cloudNotes = allNotes.map(n => ({
       id: n.clientId,
@@ -45,6 +49,7 @@ router.get('/', auth, async (req, res) => {
     res.json({
       notes: cloudNotes,
       folders: cloudFolders,
+      deletedNoteIds,
       pagination: {
         page,
         limit,
@@ -63,7 +68,7 @@ router.get('/', auth, async (req, res) => {
 // @desc    Sync local notes/folders with cloud
 // @access  Private
 router.post('/', auth, async (req, res) => {
-  const { notes, folders } = req.body;
+  const { notes, folders, deletedNoteIds = [], deletedFolderIds = [] } = req.body;
   const userId = req.user.id;
 
   try {
@@ -88,11 +93,13 @@ router.post('/', auth, async (req, res) => {
         }
       }
 
-      // Delete folders not in the sync payload (they were deleted on client)
-      await Folder.deleteMany({
-        userId,
-        clientId: { $nin: incomingClientIds }
-      });
+      // Explicitly delete folders that were deleted on client
+      if (deletedFolderIds.length > 0) {
+        await Folder.deleteMany({
+          userId,
+          clientId: { $in: deletedFolderIds }
+        });
+      }
     }
 
     // --- NOTES ---
@@ -130,17 +137,18 @@ router.post('/', auth, async (req, res) => {
         }
       }
 
-      // ✅ FEATURE: Soft delete notes not in the sync payload (they were deleted on client)
-      // Mark them as deleted instead of removing permanently
-      const now = new Date();
-      await Note.updateMany(
-        {
-          userId,
-          clientId: { $nin: incomingClientIds },
-          deletedAt: null // Only soft-delete if not already deleted
-        },
-        { deletedAt: now }
-      );
+      // Explicitly soft-delete notes that were deleted on client
+      if (deletedNoteIds.length > 0) {
+        const now = new Date();
+        await Note.updateMany(
+          {
+            userId,
+            clientId: { $in: deletedNoteIds },
+            deletedAt: null // Only soft-delete if not already deleted
+          },
+          { deletedAt: now }
+        );
+      }
     }
 
     // After push, fetch all active notes to return

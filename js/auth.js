@@ -205,6 +205,11 @@ window.API_BASE_URL = window.API_BASE_URL || configuredApiBaseUrl || 'http://loc
           window.showToast('Syncing with cloud...', 'info');
           await window.Store.syncWithCloud();
           
+          // Initiate background polling module dynamically
+          if (window.SyncManager && window.SyncManager.startPolling) {
+            window.SyncManager.startPolling();
+          }
+          
         } catch (err) {
           errorMsg.textContent = err.message;
           submitBtn.innerHTML = submitText;
