@@ -6,13 +6,14 @@ const Folder = require('../models/Folder');
 const cache = require('../utils/cache');
 
 // @route   GET api/sync
-// @desc    Fetch user's notes and folders from cloud
+// @desc    Fetch user's notes and folders from cloud (excludes deleted)
 // @access  Private
 router.get('/', auth, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const allNotes = await Note.find({ userId });
+    // ✅ FEATURE: Only fetch active notes (not in trash)
+    const allNotes = await Note.find({ userId }).active();
     const allFolders = await Folder.find({ userId });
 
     // Map back to client format
@@ -110,15 +111,21 @@ router.post('/', auth, async (req, res) => {
         }
       }
 
-      // Delete notes not in the sync payload (they were deleted on client)
-      await Note.deleteMany({
-        userId,
-        clientId: { $nin: incomingClientIds }
-      });
+      // ✅ FEATURE: Soft delete notes not in the sync payload (they were deleted on client)
+      // Mark them as deleted instead of removing permanently
+      const now = new Date();
+      await Note.updateMany(
+        {
+          userId,
+          clientId: { $nin: incomingClientIds },
+          deletedAt: null // Only soft-delete if not already deleted
+        },
+        { deletedAt: now }
+      );
     }
 
-    // After push, fetch all to return
-    const allNotes = await Note.find({ userId });
+    // After push, fetch all active notes to return
+    const allNotes = await Note.find({ userId }).active();
     const allFolders = await Folder.find({ userId });
 
     // Map back to client format
@@ -143,6 +150,115 @@ router.post('/', auth, async (req, res) => {
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');
+  }
+});
+
+// @route   GET api/sync/trash
+// @desc    Get deleted notes from trash
+// @access  Private
+router.get('/trash', auth, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const trashedNotes = await Note.find({ userId }).inTrash();
+
+    const trashNotes = trashedNotes.map(n => ({
+      id: n.clientId,
+      title: n.title,
+      content: n.content,
+      folderId: n.folderId,
+      tags: n.tags,
+      pinned: n.pinned,
+      updatedAt: n.clientUpdatedAt,
+      deletedAt: n.deletedAt,
+    }));
+
+    res.json({ notes: trashNotes });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// @route   POST api/sync/restore/:noteId
+// @desc    Restore a note from trash
+// @access  Private
+router.post('/restore/:noteId', auth, async (req, res) => {
+  const userId = req.user.id;
+  const { noteId } = req.params;
+
+  try {
+    const note = await Note.findOne({ userId, clientId: noteId });
+
+    if (!note) {
+      return res.status(404).json({ msg: 'Note not found' });
+    }
+
+    if (note.deletedAt === null) {
+      return res.status(400).json({ msg: 'Note is not in trash' });
+    }
+
+    // Restore the note
+    note.deletedAt = null;
+    await note.save();
+
+    res.json({ msg: 'Note restored', note: {
+      id: note.clientId,
+      title: note.title,
+      content: note.content,
+      folderId: note.folderId,
+      tags: note.tags,
+      pinned: note.pinned,
+      updatedAt: note.clientUpdatedAt,
+    }});
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// @route   DELETE api/sync/trash/:noteId
+// @desc    Permanently delete a note from trash
+// @access  Private
+router.delete('/trash/:noteId', auth, async (req, res) => {
+  const userId = req.user.id;
+  const { noteId } = req.params;
+
+  try {
+    const note = await Note.findOne({ userId, clientId: noteId });
+
+    if (!note) {
+      return res.status(404).json({ msg: 'Note not found' });
+    }
+
+    await Note.deleteOne({ _id: note._id });
+    res.json({ msg: 'Note permanently deleted' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// @route   POST api/sync/cleanup
+// @desc    Permanently delete notes in trash for > 30 days
+// @access  Private
+router.post('/cleanup', auth, async (req, res) => {
+  const userId = req.user.id;
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  try {
+    const result = await Note.deleteMany({
+      userId,
+      deletedAt: { $exists: true, $ne: null, $lt: thirtyDaysAgo }
+    });
+
+    res.json({
+      msg: `Cleaned up ${result.deletedCount} old deleted notes`,
+      count: result.deletedCount
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ msg: 'Server Error' });
   }
 });
 

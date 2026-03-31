@@ -30,6 +30,11 @@ const NoteSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  // ✅ FEATURE: Soft delete support (trash/recovery)
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
 }, { timestamps: true });
 
 // Add clientId field
@@ -44,5 +49,15 @@ NoteSchema.index({ userId: 1, updatedAt: -1 }); // For sorting by recent
 NoteSchema.index({ userId: 1, tags: 1 }); // For tag filtering
 NoteSchema.index({ userId: 1, folderId: 1 }); // For folder filtering
 NoteSchema.index({ userId: 1, pinned: 1 }); // For pinned notes
+NoteSchema.index({ userId: 1, deletedAt: 1 }); // For trash queries
+
+// Query helper: exclude deleted notes by default
+NoteSchema.query.active = function() {
+  return this.where({ deletedAt: null });
+};
+
+NoteSchema.query.inTrash = function() {
+  return this.where({ deletedAt: { $ne: null } });
+};
 
 module.exports = mongoose.model('Note', NoteSchema);
