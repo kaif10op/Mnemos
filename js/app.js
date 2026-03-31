@@ -110,6 +110,21 @@
     window.ThemeManager.init();
     window.SearchManager.init();
     window.Palette.init();
+    const portal = document.getElementById('auth-portal');
+    const app = document.getElementById('app');
+    const token = window.Auth.getToken();
+
+    if (!token) {
+      // 🛡️ AUTH GUARD: Show portal, hide app
+      portal?.classList.remove('hidden');
+      app.style.display = 'none';
+      return; 
+    }
+
+    // AUTH SUCCESS: Hide portal, show app
+    portal?.classList.add('hidden');
+    app.style.display = '';
+
     window.Auth.init();
     window.Sidebar.init();
     window.NoteList.init();
@@ -118,7 +133,6 @@
 
     // ✅ PRO: Local-First Rendering
     // Now trigger the silent background sync if logged in
-    const token = window.Auth.getToken();
     if (token) {
       window.Store.initSync(); 
     }

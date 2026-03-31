@@ -33,6 +33,7 @@
   <link rel="stylesheet" href="css/notelist.css" />
   <link rel="stylesheet" href="css/editor.css" />
   <link rel="stylesheet" href="css/palette.css" />
+  <link rel="stylesheet" href="css/auth-portal.css" />
 </head>
 <body>
 
@@ -40,6 +41,34 @@
   <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle sidebar">
     <i class="ph ph-list" style="font-size:24px;"></i>
   </button>
+ 
+  <!-- 🚪 AUTH PORTAL (Landing Guard) -->
+  <div class="auth-portal" id="auth-portal">
+    <div class="portal-content">
+      <div class="portal-logo-wrapper">
+        <i class="ph-duotone ph-notebook portal-logo"></i>
+        <h1 class="portal-title">Notes Saver</h1>
+        <p class="portal-subtitle">A professional, private workspace for your thoughts and structured ideas.</p>
+      </div>
+ 
+      <div class="portal-card">
+        <div class="portal-actions">
+          <button class="btn btn-primary" style="width: 100%; justify-content: center; height: 48px;" onclick="window.Auth._showAuthModal('login')">
+            <i class="ph-bold ph-sign-in"></i> Sign In to Access
+          </button>
+          
+          <div style="margin: var(--space-md) 0; position: relative; text-align: center;">
+            <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--border-default); z-index: 0;"></div>
+            <span style="position: relative; z-index: 1; background: var(--bg-secondary); padding: 0 var(--space-md); color: var(--text-secondary); font-size: 10px; text-transform: uppercase;">Or Join Us</span>
+          </div>
+ 
+          <button class="btn btn-ghost" style="width: 100%; justify-content: center; height: 48px;" onclick="window.Auth._showAuthModal('register')">
+            <i class="ph-bold ph-user-plus"></i> Create Workspace
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Sidebar Overlay (mobile) -->
   <div class="sidebar-overlay" id="sidebar-overlay"></div>
@@ -367,6 +396,10 @@
     </div>
   </div>
 
+  <!-- ══════ FIREBASE SDKs (Core Vendors) ══════ -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
   <script src="js/store.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/theme.js"></script>
@@ -381,8 +414,66 @@
   <script src="js/shortcuts.js"></script>
   <script src="js/app.js"></script>
 
-  <!-- 🚀 SERVICE WORKER REGISTRATION -->
+  <!-- 🚀 UTILS & SYSTEMS -->
   <script>
+    // 🛠️ Global UI Helpers
+    window.showModal = (html) => {
+      console.log('🚀 Triggering Modal Overlay...');
+      const modal = document.getElementById('modal');
+      const overlay = document.getElementById('modal-overlay');
+      if (modal && overlay) {
+        modal.innerHTML = html;
+        overlay.classList.add('visible');
+        console.log('✅ Modal is now VISIBLE in DOM');
+      } else {
+        console.error('❌ Modal elements not found!');
+      }
+    };
+
+    window.showToast = (message, type = 'info') => {
+      console.log(`🍞 Toast: [${type}] ${message}`);
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      
+      const icons = {
+        success: 'ph-fill ph-check-circle',
+        danger: 'ph-fill ph-warning-circle',
+        warning: 'ph-fill ph-warning',
+        info: 'ph-fill ph-info'
+      };
+
+      toast.innerHTML = `
+        <i class="${icons[type] || icons.info} toast-icon"></i>
+        <span>${message}</span>
+      `;
+
+      container.appendChild(toast);
+
+      // Auto remove
+      setTimeout(() => {
+        toast.classList.add('toast-exit');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    };
+
+    // Close modal on overlay click
+    document.getElementById('modal-overlay')?.addEventListener('click', (e) => {
+      if (e.target.id === 'modal-overlay') {
+        e.target.classList.remove('visible');
+      }
+    });
+
+    // Close modal on Escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.getElementById('modal-overlay')?.classList.remove('visible');
+      }
+    });
+
+    // ☁️ Service Worker Registration
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')

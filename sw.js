@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mnemos-pro-v1';
+const CACHE_NAME = 'mnemos-pro-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

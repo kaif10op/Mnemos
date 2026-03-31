@@ -10,7 +10,7 @@ const UserSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: false, // Optional for Google Auth users
   },
   createdAt: {
     type: Date,

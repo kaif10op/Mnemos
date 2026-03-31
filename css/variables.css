@@ -96,9 +96,10 @@
   /* ── Z-Index ── */
   --z-sidebar: 100;
   --z-overlay: 200;
-  --z-modal: 300;
-  --z-toast: 400;
-  --z-tooltip: 500;
+  --z-portal: 500;
+  --z-modal: 1000;
+  --z-toast: 2000;
+  --z-tooltip: 3000;
 }
 
 /* ── Light Theme Overrides (Zinc & Indigo) ── */

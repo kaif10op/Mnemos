@@ -40,7 +40,7 @@ function getAllNotes() {
 }
 
 function getDeletedNotes() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_NOTES) || '[]'); } 
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_NOTES) || '[]'); }
   catch { return []; }
 }
 
@@ -157,7 +157,7 @@ function getAllFolders() {
 }
 
 function getDeletedFolders() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_FOLDERS) || '[]'); } 
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_FOLDERS) || '[]'); }
   catch { return []; }
 }
 
@@ -306,7 +306,7 @@ async function fetchFromCloud() {
         const lastHash = localStorage.getItem('last_sync_hash');
         if (hash === lastHash) {
           console.log('☁️ Sync: Cache HIT (No server changes)');
-          return; 
+          return;
         }
       }
     } catch (e) {
@@ -320,7 +320,7 @@ async function fetchFromCloud() {
     const res = await window.ErrorHandler.retryWithBackoff(
       () => window.ErrorHandler.fetchWithRetry(`${window.API_BASE_URL}/sync`, {
         method: 'GET',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'If-None-Match': localStorage.getItem('last_sync_etag') || ''
         }
@@ -398,7 +398,7 @@ async function fetchFromCloud() {
     // Add only new notes from cloud that we haven't deleted locally
     notes.forEach(incoming => {
       if (deletedNoteIds.includes(incoming.id)) return;
-      
+
       const idx = activeNotes.findIndex(n => n.id === incoming.id);
       if (idx === -1) {
         activeNotes.push(incoming);
@@ -413,7 +413,7 @@ async function fetchFromCloud() {
 
     folders.forEach(incoming => {
       if (deletedFolderIds.includes(incoming.id)) return;
-      
+
       const idx = beforeFolders.findIndex(f => f.id === incoming.id);
       if (idx === -1) {
         beforeFolders.push(incoming);
@@ -637,7 +637,7 @@ window.SyncManager = {
   scheduleBackgroundSync(delay = 2000) {
     if (!window.Auth.getToken()) return;
     clearTimeout(this._timer);
-    
+
     this._timer = setTimeout(async () => {
       await window.Store.syncWithCloud();
     }, delay);

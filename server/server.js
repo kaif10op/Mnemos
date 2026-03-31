@@ -6,21 +6,24 @@ const { logger, requestLogger } = require('./utils/logger');
 
 const app = express();
 
-// ✅ SECURITY: Configure CORS with whitelist
-const corsOptions = {
-  origin: process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',')
-    : ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'],
+// 🚀 ABSOLUTE PRIORITY: CORS must be the first middleware to handle all preflights/errors
+app.use(cors({
+  origin: true, // Dynamically reflect the incoming origin in development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+}));
 
-app.use(cors(corsOptions));
+// ✅ SECURITY: Set COOP header for Firebase Auth popups
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// ✅ LOGGING: Add request logging middleware
+// ✅ LOGGING: Add request logging AFTER CORS/Security
 app.use(requestLogger);
 
 // Health check endpoint
@@ -111,6 +114,13 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5050;
 
-app.listen(PORT, () => {
-  logger.info(`Server started on port ${PORT}`, { env: process.env.NODE_ENV || 'development' });
-});
+// ✅ VERCEL SERVERLESS SUPPORT
+// Only bind to port if running locally
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    logger.info(`Server started on port ${PORT}`, { env: process.env.NODE_ENV || 'development' });
+  });
+}
+
+// Export the app for Vercel Serverless Functions
+module.exports = app;
