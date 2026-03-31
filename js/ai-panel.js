@@ -258,16 +258,34 @@
     _executeAgentAction(payload) {
        const { action, text, title, tags } = payload;
 
-       // Handle System actions first
+       // Handle System actions
        if (action === 'CREATE_NOTE') {
-          const folderId = window.Sidebar && window.Sidebar.currentFolderId ? window.Sidebar.currentFolderId : null;
+          let folderId = window.Sidebar && window.Sidebar.currentFolderId ? window.Sidebar.currentFolderId : null;
+          
+          // If AI specified a folder name, find or create it
+          const folderName = payload.folderName;
+          if (folderName) {
+             const allFolders = window.Store.getAllFolders();
+             const existing = allFolders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
+             if (existing) {
+                folderId = existing.id;
+             } else {
+                const newFolder = window.Store.createFolder(folderName);
+                folderId = newFolder.id;
+                window.Sidebar.renderFolders();
+             }
+          }
+          
           const target_title = title || '✨ AI Generated Note';
-          const strippedText = text ? text : ''; // don't format on create, openNote does it basically? Actually createNote takes markdown or text. Wait, Editor expects HTML usually
-          const newNote = window.Store.createNote(folderId, target_title, strippedText);
-          if (newNote && window.Editor) {
-             window.Editor.openNote(newNote.id);
-             window.NoteList.render();
-             window.showToast('🤖 AI created a new note', 'success');
+          const noteContent = text || '';
+          const newNote = window.Store.createNote(folderId);
+          if (newNote) {
+             window.Store.updateNote(newNote.id, { title: target_title, content: noteContent });
+             if (window.Editor) {
+                window.Editor.open(newNote.id);
+                window.NoteList.render();
+                window.showToast('🤖 AI created a new note', 'success');
+             }
           }
           return;
        }
@@ -330,6 +348,136 @@
           document.documentElement.setAttribute('data-theme', 'light');
           localStorage.setItem('mnemos_theme', 'light');
           window.showToast('🤖 Theme updated', 'success');
+          return;
+       }
+
+       // ── Workspace Organization Tools ──
+       if (action === 'CREATE_FOLDER') {
+          const folderName = title || payload.folderName || 'New Folder';
+          const folder = window.Store.createFolder(folderName);
+          if (folder) {
+             window.Sidebar.renderFolders();
+             window.showToast(`🤖 AI created folder: ${folderName}`, 'success');
+
+             // If this was part of CREATE_NOTE with a folder, also handle that
+             if (text) {
+                const newNote = window.Store.createNote(folder.id);
+                if (newNote) {
+                   window.Store.updateNote(newNote.id, { title: title || '✨ AI Note', content: text });
+                   window.Editor.open(newNote.id);
+                   window.NoteList.render();
+                }
+             }
+          }
+          return;
+       }
+
+       if (action === 'MOVE_NOTE' && currentId) {
+          const folderName = payload.folderName || title || '';
+          if (folderName) {
+             const allFolders = window.Store.getAllFolders();
+             const targetFolder = allFolders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
+             if (targetFolder) {
+                window.Store.updateNote(currentId, { folderId: targetFolder.id });
+                window.NoteList.render();
+                window.Sidebar.renderFolders();
+                window.showToast(`🤖 Note moved to "${targetFolder.name}"`, 'success');
+             } else {
+                // Folder doesn't exist — create it first
+                const newFolder = window.Store.createFolder(folderName);
+                window.Store.updateNote(currentId, { folderId: newFolder.id });
+                window.NoteList.render();
+                window.Sidebar.renderFolders();
+                window.showToast(`🤖 Created "${folderName}" and moved note`, 'success');
+             }
+          } else {
+             window.showToast('🤖 No folder name specified', 'warning');
+          }
+          return;
+       }
+
+       if (action === 'DUPLICATE_NOTE' && currentId) {
+          const srcNote = window.Store.getNote(currentId);
+          if (srcNote) {
+             const newNote = window.Store.createNote(srcNote.folderId);
+             if (newNote) {
+                window.Store.updateNote(newNote.id, {
+                   title: (srcNote.title || 'Untitled') + ' (Copy)',
+                   content: srcNote.content || '',
+                   tags: [...(srcNote.tags || [])],
+                   pinned: false
+                });
+                window.Editor.open(newNote.id);
+                window.NoteList.render();
+                window.showToast('🤖 Note duplicated', 'success');
+             }
+          }
+          return;
+       }
+
+       if (action === 'REMOVE_TAG' && currentId) {
+          const tagToRemove = (tags || '').trim().toLowerCase().replace(/^#/, '');
+          if (tagToRemove) {
+             const note = window.Store.getNote(currentId);
+             const newTags = (note.tags || []).filter(t => t.toLowerCase() !== tagToRemove);
+             window.Store.updateNote(currentId, { tags: newTags });
+             if (window.Editor._renderTags) window.Editor._renderTags(newTags);
+             window.Sidebar.renderTags();
+             window.showToast(`🤖 Removed tag: ${tagToRemove}`, 'success');
+          }
+          return;
+       }
+
+       // ── AI-Powered Tools ──
+       if (action === 'CREATE_FLASHCARDS') {
+          // Trigger the existing flashcard flow via the quick action handler
+          if (window.AIPanel) {
+             window.AIPanel._handleQuickAction('flashcards');
+          }
+          return;
+       }
+
+       if (action === 'EXPORT_PDF') {
+          // Use browser print dialog for PDF export
+          const editorBody = document.getElementById('editor-body');
+          const titleEl = document.getElementById('editor-title');
+          if (editorBody) {
+             const printWindow = window.open('', '_blank');
+             printWindow.document.write(`
+                <!DOCTYPE html><html><head><title>${titleEl?.value || 'Mnemos Note'}</title>
+                <style>
+                   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.6; }
+                   h1 { font-size: 24px; border-bottom: 2px solid #6366f1; padding-bottom: 8px; }
+                   table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+                   td, th { border: 1px solid #ddd; padding: 8px 12px; }
+                   th { background: #f5f5f5; }
+                   pre { background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto; }
+                   code { font-family: 'Fira Code', monospace; font-size: 13px; }
+                   blockquote { border-left: 3px solid #6366f1; padding: 8px 16px; margin: 12px 0; color: #666; font-style: italic; }
+                   img { max-width: 100%; }
+                   @media print { body { margin: 0; } }
+                </style></head><body>
+                <h1>${titleEl?.value || 'Untitled'}</h1>
+                ${editorBody.innerHTML}
+                </body></html>
+             `);
+             printWindow.document.close();
+             printWindow.focus();
+             setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+             window.showToast('🤖 PDF export opened', 'success');
+          }
+          return;
+       }
+
+       if (action === 'INSERT_MERMAID') {
+          // Render mermaid diagram in the existing modal
+          const mermaidCode = text || '';
+          if (mermaidCode && window.AIPanel._renderMindMapUI) {
+             window.AIPanel._renderMindMapUI(mermaidCode);
+             window.showToast('🤖 Mermaid diagram generated', 'success');
+          } else {
+             window.showToast('🤖 No diagram content generated', 'warning');
+          }
           return;
        }
 
@@ -436,7 +584,7 @@
           rangeObj.selectNodeContents(body);
           document.getSelection().addRange(rangeObj);
           document.execCommand('insertHTML', false, cleanHtml);
-       } else if (action === 'APPEND_BOTTOM' || action === 'INSERT_IMAGE' || action === 'GENERATE_TABLE' || action === 'GENERATE_LIST' || action === 'SUMMARIZE_INLINE') {
+       } else if (action === 'APPEND_BOTTOM' || action === 'INSERT_IMAGE' || action === 'GENERATE_TABLE' || action === 'GENERATE_LIST' || action === 'SUMMARIZE_INLINE' || action === 'INSERT_CODE_BLOCK' || action === 'INSERT_CHECKLIST' || action === 'INSERT_BLOCKQUOTE') {
           const rangeObj = document.createRange();
           rangeObj.selectNodeContents(body);
           rangeObj.collapse(false); // end
