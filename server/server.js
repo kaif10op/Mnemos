@@ -87,7 +87,9 @@ const connectDB = async () => {
     logger.info('GridFS Bucket initialized with performance indexing');
   } catch (err) {
     logger.error('Database connection failed', { error: err.message });
-    process.exit(1);
+    // DANGEROUS IN SERVERLESS: process.exit(1); 
+    // We let the lambda survive so subsequent requests can re-attempt connection.
+    isConnected = false;
   }
 };
 connectDB();

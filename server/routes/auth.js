@@ -46,15 +46,12 @@ router.post('/register', authLimiter, validate('register'), async (req, res) => 
       },
     };
 
-    jwt.sign(
+    const token = jwt.sign(
       payload,
       process.env.JWT_SECRET || 'mnemos_secret_key_123',
-      { expiresIn: '7d' },
-      (err, token) => {
-        if (err) throw err;
-        res.json({ token, user: { id: user.id, email: user.email } });
-      }
+      { expiresIn: '7d' }
     );
+    res.json({ token, user: { id: user.id, email: user.email } });
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ msg: 'Server error during registration' });
@@ -86,15 +83,12 @@ router.post('/login', authLimiter, validate('login'), async (req, res) => {
       },
     };
 
-    jwt.sign(
+    const token = jwt.sign(
       payload,
       process.env.JWT_SECRET || 'mnemos_secret_key_123',
-      { expiresIn: '7d' },
-      (err, token) => {
-        if (err) throw err;
-        res.json({ token, user: { id: user.id, email: user.email } });
-      }
+      { expiresIn: '7d' }
     );
+    res.json({ token, user: { id: user.id, email: user.email } });
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ msg: 'Server error during login' });
@@ -157,15 +151,12 @@ router.post('/google', async (req, res) => {
       }
     };
 
-    jwt.sign(
+    const token = jwt.sign(
       payload,
       process.env.JWT_SECRET || 'mnemos_secret_key_123',
-      { expiresIn: '7d' },
-      (err, token) => {
-        if (err) throw err;
-        res.json({ token, user: { id: user.id, email: user.email } });
-      }
+      { expiresIn: '7d' }
     );
+    res.json({ token, user: { id: user.id, email: user.email } });
   } catch (err) {
     console.error('Google Auth Error:', err.message);
     res.status(500).json({ msg: 'Google Authentication Error' });
