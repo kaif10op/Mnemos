@@ -129,10 +129,40 @@ function getFilteredNotes({ folderId = null, tag = null, search = '' } = {}) {
     );
   }
 
-  // Pinned first, then by updatedAt
+  // Apply user-selected sort (Always keeping Pinned first)
+  const sortBy = getSettings().sortBy || 'newest';
+  
   notes.sort((a, b) => {
+    // Pinned always on top
     if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
-    return new Date(b.updatedAt) - new Date(a.updatedAt);
+    
+    switch (sortBy) {
+      case 'oldest':
+      case 'date_asc':
+        return new Date(a.createdAt || a.updatedAt) - new Date(b.createdAt || b.updatedAt);
+      case 'newest':
+      case 'date_desc':
+        return new Date(b.updatedAt) - new Date(a.updatedAt);
+        
+      case 'alpha':
+      case 'alpha_asc':
+      case 'a-z':
+        return (a.title || '').localeCompare(b.title || '');
+      case 'alpha_desc':
+      case 'z-a':
+        return (b.title || '').localeCompare(a.title || '');
+        
+      case 'length':
+      case 'length_desc':
+      case 'longest':
+        return (b.content || '').length - (a.content || '').length;
+      case 'length_asc':
+      case 'shortest':
+        return (a.content || '').length - (b.content || '').length;
+        
+      default:
+        return new Date(b.updatedAt) - new Date(a.updatedAt); // newest
+    }
   });
 
   return notes;
