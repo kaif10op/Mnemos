@@ -89,7 +89,7 @@
   };
 
   // ── Bootstrap ──
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
 
     // Sidebar Toggle Logic
     const toggleBtn = document.getElementById('sidebar-toggle-btn');
@@ -114,6 +114,9 @@
     const app = document.getElementById('app');
     const token = window.Auth.getToken();
 
+    // 🚀 INITIALIZE AUTH: Always do this first so Firebase is ready for guests/login
+    await window.Auth.initialize();
+
     if (!token) {
       // 🛡️ AUTH GUARD: Show portal, hide app
       portal?.classList.remove('hidden');
@@ -125,7 +128,6 @@
     portal?.classList.add('hidden');
     app.style.display = '';
 
-    window.Auth.init();
     window.Sidebar.init();
     window.NoteList.init();
     window.Editor.init();

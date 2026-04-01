@@ -14,24 +14,71 @@ if (isLocalhost && (!configuredApiBaseUrl || configuredApiBaseUrl === '/api')) {
 window.API_BASE_URL = window.API_BASE_URL || configuredApiBaseUrl || '/api';
 
 // 🚀 FIREBASE INITIALIZATION
-const firebaseConfig = {
-  apiKey: "AIzaSyDW0T91yX5ISK67NdcmgDhwESfpaRBcJvE",
-  authDomain: "log-in-with-59978.firebaseapp.com",
-  projectId: "log-in-with-59978",
-  storageBucket: "log-in-with-59978.firebasestorage.app",
-  messagingSenderId: "423009600149",
-  appId: "1:423009600149:web:ad9f5e0b081c027eb7919c"
-};
-
-if (typeof firebase !== 'undefined') {
-  firebase.initializeApp(firebaseConfig);
-}
+let firebaseConfig = null;
 
 (function () {
   window.Auth = {
-    init() {
+    async initialize() {
+      // 1. Fetch config from server
+      try {
+        const res = await fetch(`${window.API_BASE_URL}/config/firebase`);
+        firebaseConfig = await res.json();
+        console.log('✅ Auth: CONFIG_FETCHED');
+        
+        // 🛡️ WAIT FOR SDK: If firebase or auth service is not yet defined, wait up to 3 seconds
+        if (typeof firebase === 'undefined' || !firebase.auth) {
+          console.log('⏳ Auth: Waiting for Firebase SDK & Auth Service...');
+          let retries = 30; // 30 * 100ms = 3s
+          while ((typeof firebase === 'undefined' || !firebase.auth) && retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries--;
+          }
+        }
+
+        if (typeof firebase !== 'undefined') {
+          console.log('✅ Auth: SDK_LOADED');
+          
+          if (firebase.auth) {
+            console.log('✅ Auth: AUTH_READY');
+            
+            if (firebaseConfig && firebaseConfig.apiKey) {
+              // ENSURE ONLY ONE APP: Avoid "DEFAULT app already exists" errors
+              if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+                console.log('🔥 Auth: Firebase initialized successfully');
+                
+                // 🔄 CHECK REDIRECT RESULT: Catch users returning from Google Redirect
+                firebase.auth().getRedirectResult().then(result => {
+                  if (result && result.user) {
+                    console.log('✅ Auth: Redirect success detected');
+                    this._handleAuthResult(result);
+                  }
+                }).catch(err => {
+                  console.error('❌ Auth: Redirect error:', err);
+                });
+
+              } else {
+                console.log('🔥 Auth: Firebase was already initialized');
+              }
+            } else {
+              console.error('❌ Auth: Firebase Config is missing or invalid.');
+            }
+          } else {
+            console.error('❌ Auth: Firebase Auth service fail to load after 3s.');
+          }
+        } else {
+          console.error('❌ Auth: Firebase SDK failed to load after 3s. Google Login will be disabled.');
+        }
+      } catch (e) {
+        console.error('❌ Auth: Failed to initialize Firebase:', e);
+      }
+
       this._bindAuthButton();
       this.updateAuthUI();
+    },
+
+    init() {
+      // This is now handled by initialize() in app.js
     },
 
     getToken() {
@@ -244,6 +291,13 @@ if (typeof firebase !== 'undefined') {
 
       // 🌈 GOOGLE AUTH LOGIC
       document.getElementById('google-auth-btn')?.addEventListener('click', async () => {
+          if (typeof firebase === 'undefined' || !firebase.auth) {
+          window.showToast('Authentication SDK failed to load. Please refresh or check your connection.', 'danger');
+          const status = `firebase: ${typeof firebase !== 'undefined'}, auth: ${firebase && !!firebase.auth}`;
+          console.error(`❌ Auth: Failure before sign-in attempt. Status: ${status}`);
+          return;
+        }
+        
         const btn = document.getElementById('google-auth-btn');
         const originalContent = btn.innerHTML;
         btn.innerHTML = '<i class="ph-bold ph-spinner" style="animation: spin 1s linear infinite;"></i> Connecting...';
@@ -251,44 +305,84 @@ if (typeof firebase !== 'undefined') {
 
         try {
           const provider = new firebase.auth.GoogleAuthProvider();
-          // 🛡️ SECURITY: Explicitly request email and profile for complete identity
-          provider.addScope('email');
-          provider.addScope('profile');
+          // Force select account to prevent silent failures on multiple accounts
+          provider.setCustomParameters({ prompt: 'select_account' });
           
-          // 🔄 FORCE: Clear existing sticky session to allow account switching
-          await firebase.auth().signOut();
-          const result = await firebase.auth().signInWithPopup(provider);
-          const idToken = await result.user.getIdToken();
+          try {
+            // 🛡️ ATTEMPT 1: Popup (Preferred UX)
+            const result = await firebase.auth().signInWithPopup(provider);
+            await this._handleAuthResult(result);
+          } catch (popupErr) {
+            console.error('❌ Auth: Popup attempt encountered an issue:', popupErr.code, popupErr.message);
+            
+            // 🔄 ATTEMPT 2: Fallback to Redirect if popup is blocked or closed by policy
+            if (popupErr.code === 'auth/popup-closed-by-user' || 
+                popupErr.code === 'auth/popup-blocked' || 
+                popupErr.code === 'auth/internal-error') {
+              
+              window.showToast('Popup blocked or restricted. Redirecting to Google Login...', 'info');
+              
+              // ⏳ Delay slightly for better UX (so user can read the toast)
+              setTimeout(async () => {
+                await firebase.auth().signInWithRedirect(provider);
+              }, 1000);
+              
+              return; // 🛑 EXIT to avoid the secondary "danger" toast below
 
-          // 🔑 DEEP IDENTITY: Extract email even if restricted
-          const verifiedEmail = result.user.email || result.user.providerData?.[0]?.email;
-          
-          // Exchange Firebase token for our app JWT
-          const res = await fetch(`${window.API_BASE_URL}/auth/google`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              idToken,
-              email: verifiedEmail 
-            })
-          });
-
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.msg || 'Google Sign-In failed');
-
-          this.setToken(data.token, data.user);
-          window.showToast(`Welcome, ${data.user.email}!`, 'success');
-          document.getElementById('modal-overlay').classList.remove('visible');
-
-          // 🚀 Reveal the Workspace
-          setTimeout(() => window.location.reload(), 500);
+            } else {
+              throw popupErr; // Re-throw if it's another kind of error (e.g. cancelled)
+            }
+          }
 
         } catch (err) {
-          window.showToast(err.message, 'danger');
+          console.error('Google Sign-In Error:', err);
+          let userMsg = err.message;
+          
+          // Enhanced error detection for CSP or popup blocking
+          if (err.code === 'auth/popup-blocked') {
+            userMsg = 'Sign-in popup was blocked by your browser. Please allow popups for this site.';
+          } else if (err.code === 'auth/internal-error' || err.message.includes('apis.google.com')) {
+            userMsg = 'A security restriction (CSP) or network error prevented Google Sign-In. Please check your browser settings.';
+          }
+          
+          window.showToast(userMsg, 'danger');
           btn.innerHTML = originalContent;
           btn.disabled = false;
         }
       });
+    },
+
+    async _handleAuthResult(result) {
+      try {
+        const idToken = await result.user.getIdToken();
+        await this._verifyWithBackend(idToken);
+      } catch (err) {
+        console.error('❌ Auth: Failed to handle auth result:', err);
+        window.showToast('Security verification failed.', 'danger');
+      }
+    },
+
+    async _verifyWithBackend(idToken) {
+      try {
+        const res = await fetch(`${window.API_BASE_URL}/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.msg || 'Backend verification failed');
+
+        this.setToken(data.token, data.user);
+        window.showToast('Successfully authenticated!', 'success');
+        document.getElementById('modal-overlay')?.classList.remove('visible');
+
+        // 🚀 Reveal the Workspace
+        setTimeout(() => window.location.reload(), 500);
+      } catch (err) {
+        console.error('❌ Auth: Backend verification error:', err);
+        throw err;
+      }
     }
   };
 })();

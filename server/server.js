@@ -50,19 +50,20 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
 
-// ✅ SECURITY: Set COOP header for Firebase Auth popups
+// ✅ SECURITY: Content Security Policy & COOP to prevent XSS and enable Auth Popups
 app.use((req, res, next) => {
+  // 🛡️ Allow Firebase Auth popups to communicate with the main window
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-  // ✅ SECURITY: Content Security Policy to prevent XSS
+
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.google-analytics.com https://cdn.tailwindcss.com https://*.consentmanager.net https://unpkg.com https://www.gstatic.com; " +
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.tailwindcss.com; " +
+    "script-src 'self' 'unsafe-inline' https://apis.google.com https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.google-analytics.com https://cdn.tailwindcss.com https://unpkg.com https://www.gstatic.com https://*.firebase.com https://*.firebaseapp.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com; " +
     "img-src 'self' data: https: blob:; " +
     "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com https://cdn.jsdelivr.net; " +
-    "connect-src 'self' https://firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://*.consentmanager.net https://*.delivery.consentmanager.net; " +
-    "frame-src 'self' https://*.firebaseapp.com https://www.googletagmanager.com; " +
+    "connect-src 'self' https://*.firebase.google.com https://*.firebaseapp.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://*.google.com; " +
+    "frame-src 'self' https://apis.google.com https://*.firebaseapp.com https://*.firebase.com https://www.googletagmanager.com; " +
     "object-src 'none'; " +
     "base-uri 'self'; " +
     "form-action 'self'; " +
@@ -99,6 +100,18 @@ const shareLimiter = rateLimit({
 app.get('/health', (req, res) => {
   logger.info('Health check requested');
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ✅ CONFIG: Expose Firebase Public Config for UI initialization
+app.get('/api/config/firebase', (req, res) => {
+  res.json({
+    apiKey: process.env.FIREBASE_API_KEY,
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.FIREBASE_APP_ID
+  });
 });
 
 // ✅ SERVERLESS OPTIMIZATION: Cache DB connection to prevent pool exhaustion
@@ -235,6 +248,8 @@ const staticOptions = {
   etag: true,
   setHeaders: (res, path) => {
     if (path.endsWith('.html')) {
+      // 🛡️ SECURITY: Match COOP with Google's Auth popups for cross-window communication
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
       // Don't cache HTML files — always check for updates
       res.setHeader('Cache-Control', 'no-cache');
     } else if (path.includes('/assets/') || path.endsWith('.css') || path.endsWith('.js') || path.endsWith('.woff2')) {
