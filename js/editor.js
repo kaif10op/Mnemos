@@ -1421,6 +1421,123 @@
       });
     },
 
+    /* ── Settings & Shares Manager ── */
+    async _showSettingsModal() {
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const API_BASE_URL = localStorage.getItem('notesaver_api_base_url') || (isLocalhost ? 'http://localhost:5050/api' : '/api');
+      const token = localStorage.getItem('notesaver_token');
+
+      if (!token) {
+        window.showToast('Please sign in to manage shared links', 'error');
+        return;
+      }
+
+      // Initial loading state
+      window.showModal(`
+        <div style="padding: 24px; min-width: 400px;">
+          <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+            <i class="ph-duotone ph-share-network" style="color:var(--accent-primary)"></i> Managed Shared Links
+          </h3>
+          <div id="settings-loader" style="text-align: center; padding: 40px;">
+            <i class="ph-bold ph-circle-notch ph-spin" style="font-size: 32px; color: var(--accent-primary);"></i>
+            <p style="margin-top: 16px; color: var(--text-secondary);">Fetching your active links...</p>
+          </div>
+          <div id="shares-list-container" style="display: none;"></div>
+        </div>
+      `);
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/share/shares/list`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error('Failed to fetch shares');
+
+        const data = await res.json();
+        const container = document.getElementById('shares-list-container');
+        const loader = document.getElementById('settings-loader');
+
+        if (!container || !loader) return;
+
+        loader.style.display = 'none';
+        container.style.display = 'block';
+
+        if (!data.shares || data.shares.length === 0) {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: var(--text-tertiary);">
+              <i class="ph-duotone ph-link-break" style="font-size: 48px; margin-bottom: 12px; opacity: 0.5;"></i>
+              <p>No active shared links found.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = `
+          <div style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px;">
+            ${data.shares.map(share => `
+              <div class="share-item" style="background: var(--bg-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${share.noteTitle}">
+                    ${share.noteTitle || 'Untitled Note'}
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-tertiary); display: flex; gap: 12px;">
+                    <span><i class="ph ph-eye"></i> ${share.views || 0} views</span>
+                    <span><i class="ph ph-calendar"></i> ${new Date(share.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 8px; margin-left: 16px;">
+                  <a href="${share.url}" target="_blank" class="btn btn-icon" title="View Public Page" style="color: var(--accent-primary);">
+                    <i class="ph-bold ph-arrow-square-out"></i>
+                  </a>
+                  <button class="btn btn-icon revoke-share-btn" data-token="${share.token}" title="Revoke Link" style="color: #ef4444;">
+                    <i class="ph-bold ph-trash"></i>
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+
+        // Bind revoke actions
+        container.querySelectorAll('.revoke-share-btn').forEach(btn => {
+          btn.onclick = async () => {
+            if (!confirm('Are you sure you want to revoke this share link? It will stop working immediately.')) return;
+            
+            const shareToken = btn.dataset.token;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph-bold ph-circle-notch ph-spin"></i>';
+
+            try {
+              const delRes = await fetch(`${API_BASE_URL}/share/${shareToken}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+
+              if (delRes.ok) {
+                window.showToast('Share link revoked', 'success');
+                this._showSettingsModal(); // Refresh list
+              } else {
+                throw new Error('Failed to revoke');
+              }
+            } catch (err) {
+              window.showToast('Revoke failed: ' + err.message, 'error');
+              btn.disabled = false;
+              btn.innerHTML = '<i class="ph-bold ph-trash"></i>';
+            }
+          };
+        });
+
+      } catch (err) {
+        const container = document.getElementById('shares-list-container');
+        if (container) {
+          container.innerHTML = `<p style="color: #ef4444; text-align: center;">Error: ${err.message}</p>`;
+          container.style.display = 'block';
+        }
+        const loader = document.getElementById('settings-loader');
+        if (loader) loader.style.display = 'none';
+      }
+    },
+
     /* ── Image Manipulation Engine ── */
 
     /* ── Unified Block Manipulation Engine (Pro) ── */
