@@ -37,7 +37,7 @@
     async fetchWithRetry(url, options = {}, maxRetries = MAX_RETRIES) {
       return this.retryWithBackoff(
         () => fetch(url, options).then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          if (!res.ok && res.status !== 304) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
           return res;
         }),
         maxRetries

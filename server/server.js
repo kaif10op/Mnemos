@@ -57,12 +57,12 @@ app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.google-analytics.com https://cdn.tailwindcss.com; " +
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.google-analytics.com https://cdn.tailwindcss.com https://*.consentmanager.net https://unpkg.com https://www.gstatic.com; " +
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.tailwindcss.com; " +
     "img-src 'self' data: https: blob:; " +
-    "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; " +
-    "connect-src 'self' https://firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com; " +
-    "frame-src 'self' https://*.firebaseapp.com; " +
+    "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com https://cdn.jsdelivr.net; " +
+    "connect-src 'self' https://firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://*.consentmanager.net https://*.delivery.consentmanager.net; " +
+    "frame-src 'self' https://*.firebaseapp.com https://www.googletagmanager.com; " +
     "object-src 'none'; " +
     "base-uri 'self'; " +
     "form-action 'self'; " +
@@ -80,7 +80,7 @@ app.use(requestLogger);
 // ✅ SECURITY: Rate limiting for API endpoints
 const syncLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 20, // Max 20 requests per 5 minutes
+  max: 100, // Max 100 requests per 5 minutes (Increased for active editor)
   message: 'Too many sync requests, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
@@ -89,7 +89,7 @@ const syncLimiter = rateLimit({
 
 const shareLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 30, // Max 30 requests per 5 minutes
+  max: 100, // Max 100 requests per 5 minutes (Increased)
   message: 'Too many share requests, please try again later',
   standardHeaders: true,
   legacyHeaders: false
