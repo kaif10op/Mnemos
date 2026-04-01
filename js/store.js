@@ -133,35 +133,22 @@ function getFilteredNotes({ folderId = null, tag = null, search = '' } = {}) {
   const sortBy = getSettings().sortBy || 'newest';
   
   notes.sort((a, b) => {
-    // Pinned always on top
-    if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
+    // 📌 Pinned always on top
+    if (a.pinned !== b.pinned) return b.pinned ? -1 : 1;
     
     switch (sortBy) {
       case 'oldest':
-      case 'date_asc':
-        return new Date(a.createdAt || a.updatedAt) - new Date(b.createdAt || b.updatedAt);
-      case 'newest':
-      case 'date_desc':
-        return new Date(b.updatedAt) - new Date(a.updatedAt);
-        
-      case 'alpha':
-      case 'alpha_asc':
+        // Sort by creation date (oldest first)
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      
       case 'a-z':
-        return (a.title || '').localeCompare(b.title || '');
-      case 'alpha_desc':
-      case 'z-a':
-        return (b.title || '').localeCompare(a.title || '');
+        // Sort alphabetically by title
+        return (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
         
-      case 'length':
-      case 'length_desc':
-      case 'longest':
-        return (b.content || '').length - (a.content || '').length;
-      case 'length_asc':
-      case 'shortest':
-        return (a.content || '').length - (b.content || '').length;
-        
+      case 'newest':
       default:
-        return new Date(b.updatedAt) - new Date(a.updatedAt); // newest
+        // Sort by modification date (newest first)
+        return new Date(b.updatedAt) - new Date(a.updatedAt);
     }
   });
 

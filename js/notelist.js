@@ -9,6 +9,7 @@
   window.NoteList = {
     init() {
       this._bindNewNote();
+      this._bindSort();
       this.render();
     },
 
@@ -196,6 +197,34 @@
       if (btn) {
         btn.addEventListener('click', () => this.createNew());
       }
+    },
+
+    _bindSort() {
+      const sortBar = document.querySelector('.notelist-sort');
+      if (!sortBar) return;
+
+      // Sync UI with current settings
+      const currentSort = window.Store.getSettings().sortBy || 'newest';
+      sortBar.querySelectorAll('.sort-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.sort === currentSort);
+      });
+
+      sortBar.addEventListener('click', (e) => {
+        const btn = e.target.closest('.sort-btn');
+        if (!btn) return;
+
+        const sortBy = btn.dataset.sort;
+        
+        // Update UI
+        sortBar.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Update Store
+        window.Store.saveSetting('sortBy', sortBy);
+
+        // Force Re-render
+        this.render(true);
+      });
     },
 
     createNew() {

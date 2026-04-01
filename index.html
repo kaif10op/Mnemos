@@ -211,6 +211,9 @@
       <i class="ph-fill ph-microphone"></i>
     </button>
 
+    <!-- ══════ SIDEBAR RESIZER ══════ -->
+    <div class="resizer resizer-sidebar" id="resizer-sidebar"></div>
+
     <!-- ══════ NOTE LIST ══════ -->
     <section class="notelist" aria-label="Notes list">
 
@@ -232,9 +235,9 @@
 
       <!-- Sort Bar -->
       <div class="notelist-sort">
-        <button class="sort-btn active" data-sort="updated" aria-label="Sort by recent">Recent</button>
-        <button class="sort-btn" data-sort="title" aria-label="Sort alphabetically">A–Z</button>
-        <button class="sort-btn" data-sort="created" aria-label="Sort by creation date">Created</button>
+        <button class="sort-btn active" data-sort="newest" aria-label="Sort by recent">Recent</button>
+        <button class="sort-btn" data-sort="a-z" aria-label="Sort alphabetically">A–Z</button>
+        <button class="sort-btn" data-sort="oldest" aria-label="Sort by original date">Created</button>
       </div>
 
       <!-- Note Cards -->
@@ -245,18 +248,23 @@
 
     </section>
 
+    <!-- ══════ EDITOR RESIZER ══════ -->
+    <div class="resizer resizer-editor" id="resizer-editor"></div>
+
     <!-- ══════ EDITOR ══════ -->
     <main class="editor-panel" role="main">
 
       <!-- Empty Editor State -->
       <div class="editor-empty" id="editor-empty-state">
-        <div class="editor-empty-icon"><i class="ph-duotone ph-pencil-simple" style="font-size:64px;"></i></div>
-        <h2>Select a note to start editing</h2>
-        <p>Choose a note from the list or create a new one</p>
+        <div class="editor-empty-brand">
+          <div class="editor-empty-icon"><i class="ph-duotone ph-notebook" style="font-size:80px; opacity: 0.15;"></i></div>
+          <h2>Ready to focus?</h2>
+          <p>Select a note from the library or start a fresh one to begin.</p>
+        </div>
         <div class="editor-empty-shortcuts">
-          <div class="shortcut-hint"><kbd class="kbd">Ctrl+N</kbd><span>New note</span></div>
-          <div class="shortcut-hint"><kbd class="kbd">Ctrl+F</kbd><span>Search</span></div>
-          <div class="shortcut-hint"><kbd class="kbd">Ctrl+/</kbd><span>All shortcuts</span></div>
+          <div class="shortcut-hint"><kbd class="kbd">Ctrl+N</kbd><span>Compose new note</span></div>
+          <div class="shortcut-hint"><kbd class="kbd">Ctrl+F</kbd><span>Search Workspace</span></div>
+          <div class="shortcut-hint"><kbd class="kbd">Ctrl+/</kbd><span>Display Shortcuts</span></div>
         </div>
       </div>
 
@@ -502,6 +510,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 
   <script src="js/store.js"></script>
+  <script src="js/resizer.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/theme.js"></script>
   <script src="js/search.js"></script>

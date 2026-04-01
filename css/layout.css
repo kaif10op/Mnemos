@@ -4,16 +4,28 @@
 
 #app {
   display: grid;
-  grid-template-columns: var(--sidebar-width) var(--notelist-width) 1fr;
+  grid-template-columns: var(--sidebar-width) auto var(--notelist-width) auto 1fr;
   grid-template-rows: 1fr;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  transition: grid-template-columns 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: grid-template-columns 400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Disable transitions during drag for performance */
+#app.resizing {
+  transition: none !important;
+  cursor: col-resize;
+  user-select: none;
 }
 
 #app.sidebar-collapsed {
-  grid-template-columns: 0px var(--notelist-width) 1fr;
+  grid-template-columns: 0px 0px var(--notelist-width) auto 1fr;
+}
+
+#app.sidebar-collapsed .resizer-sidebar {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ── Panels ── */
@@ -37,7 +49,7 @@
 }
 
 .notelist {
-  grid-column: 2;
+  grid-column: 3;
   background: var(--bg-primary);
   border-right: 1px solid var(--border-default);
   display: flex;
@@ -48,7 +60,7 @@
 }
 
 .editor-panel {
-  grid-column: 3;
+  grid-column: 5;
   background: var(--editor-bg-primary);
   display: flex;
   flex-direction: column;
@@ -57,6 +69,37 @@
   transition: background var(--transition-slow);
   border-left: 1px solid var(--border-default);
 }
+
+/* ── Resizers ── */
+.resizer {
+  grid-row: 1;
+  width: var(--resizer-width);
+  background: var(--border-default);
+  cursor: col-resize;
+  position: relative;
+  transition: background var(--transition-base), box-shadow var(--transition-base);
+  z-index: var(--z-resizer);
+}
+
+.resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--resizer-hit-area);
+}
+
+.resizer:hover,
+.resizer.active {
+  background: var(--resizer-color) !important;
+  box-shadow: 0 0 12px var(--accent-primary-glow);
+}
+
+.resizer-sidebar { grid-column: 2; }
+.resizer-editor { grid-column: 4; }
+
 
 /* ── Mobile overlay ── */
 .sidebar-overlay {
@@ -123,11 +166,44 @@
 
   .notelist {
     grid-column: 1;
+    border-right: 1px solid var(--border-default);
   }
 
   .editor-panel {
-    grid-column: 2;
+    grid-column: 3;
+    border-left: none;
   }
+}
+
+/* ── Global Scrollbars ── */
+::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+  height: var(--scrollbar-width);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Specific overrides for cleaner panels */
+.sidebar-content::-webkit-scrollbar,
+.notelist-cards::-webkit-scrollbar,
+.editor-body::-webkit-scrollbar {
+  width: 4px;
 }
 
 /* ── Responsive: Mobile ── */

@@ -95,13 +95,22 @@
   --transition-spring: 200ms ease;
 
   /* ── Layout ── */
-  --sidebar-width: 250px;
+  --sidebar-width: 260px;
   --notelist-width: 320px;
   --toolbar-height: 48px;
-  --scrollbar-width: 4px;
+  --scrollbar-width: 6px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: var(--border-default);
+  --scrollbar-thumb-hover: var(--border-hover);
+
+  /* ── Resizer ── */
+  --resizer-width: 4px;
+  --resizer-hit-area: 12px;
+  --resizer-color: var(--accent-primary);
 
   /* ── Z-Index ── */
   --z-sidebar: 100;
+  --z-resizer: 150;
   --z-overlay: 200;
   --z-portal: 500;
   --z-modal: 1000;

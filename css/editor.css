@@ -502,33 +502,49 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-lg);
-  padding: var(--space-3xl);
   text-align: center;
+  padding: var(--space-4xl);
+  color: var(--text-secondary);
+  background: var(--editor-bg-primary);
   animation: fadeIn var(--transition-slow) both;
 }
 
+.editor-empty-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-4xl);
+}
+
 .editor-empty-icon {
-  font-size: 64px;
-  opacity: 0.15;
+  margin-bottom: var(--space-md);
+  color: var(--accent-primary);
+  filter: drop-shadow(0 0 20px var(--accent-primary-glow));
 }
 
 .editor-empty h2 {
-  font-size: var(--font-size-lg);
-  color: var(--text-secondary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
 .editor-empty p {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-md);
   color: var(--text-tertiary);
-  max-width: 280px;
+  max-width: 400px;
+  line-height: var(--line-height-base);
 }
 
 .editor-empty-shortcuts {
-  margin-top: var(--space-lg);
   display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-xl);
+  margin-top: var(--space-xl);
+  padding: var(--space-lg);
+  border-radius: var(--radius-xl);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
 }
 
 .shortcut-hint {
