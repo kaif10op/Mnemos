@@ -3,11 +3,14 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const Note = require('../models/Note');
 const Folder = require('../models/Folder');
+const Audit = require('../models/Audit');
 const cache = require('../utils/cache');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { logger } = require('../utils/logger');
+const { validate } = require('../utils/validation');
 
 const { Readable } = require('stream');
 const mongoose = require('mongoose');
@@ -233,55 +236,124 @@ router.get('/', auth, async (req, res) => {
 // @route   POST api/sync
 // @desc    Sync local notes/folders with cloud
 // @access  Private
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, validate('syncData'), async (req, res) => {
   const { notes, folders, deletedNoteIds = [], deletedFolderIds = [] } = req.body;
   const userId = req.user.id;
 
   // 🚀 INVALIDATE CACHE on push
   clearStatusCache(userId);
 
+  // ✅ TRANSACTIONS: Use MongoDB session for atomic operations
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    // --- FOLDERS ---
+    // =========================
+    // FOLDERS: Batch Operations
+    // =========================
     if (folders && Array.isArray(folders)) {
-      // Get all existing folder client IDs from the sync payload
       const incomingClientIds = folders.map(f => f.id);
 
+      // Fetch ALL existing folders at once (one query, not N queries)
+      const existingFolders = await Folder.find({
+        userId,
+        clientId: { $in: incomingClientIds }
+      }).session(session);
+
+      // Create a map for O(1) lookup
+      const existingMap = new Map(existingFolders.map(f => [f.clientId, f]));
+
+      // Prepare bulk operations
+      const bulkOps = [];
+      const newFolders = [];
+
       for (const f of folders) {
-        const existing = await Folder.findOne({ userId, clientId: f.id });
-        if (!existing) {
-          await new Folder({
+        if (existingMap.has(f.id)) {
+          const existing = existingMap.get(f.id);
+          // Update existing folder
+          bulkOps.push({
+            updateOne: {
+              filter: { _id: existing._id },
+              update: { $set: { name: f.name, icon: f.icon } }
+            }
+          });
+        } else {
+          // Collect new folders for batch insert
+          newFolders.push({
             userId,
             clientId: f.id,
             name: f.name,
             icon: f.icon
-          }).save();
-        } else {
-          existing.name = f.name;
-          existing.icon = f.icon;
-          await existing.save();
+          });
         }
       }
 
-      // Explicitly delete folders that were deleted on client
+      // Execute bulk update (if any)
+      if (bulkOps.length > 0) {
+        await Folder.bulkWrite(bulkOps, { session });
+      }
+
+      // Insert all new folders in one batch (not N individual inserts)
+      if (newFolders.length > 0) {
+        await Folder.insertMany(newFolders, { session });
+      }
+
+      // Delete folders that were deleted on client
       if (deletedFolderIds.length > 0) {
         await Folder.deleteMany({
           userId,
           clientId: { $in: deletedFolderIds }
-        });
+        }, { session });
       }
     }
 
-    // --- NOTES ---
+    // =======================
+    // NOTES: Batch Operations
+    // =======================
     if (notes && Array.isArray(notes)) {
-      // Get all existing note client IDs from the sync payload
       const incomingClientIds = notes.map(n => n.id);
 
-      for (const n of notes) {
-        const existing = await Note.findOne({ userId, clientId: n.id });
+      // Fetch ALL existing notes at once (one query, not N queries)
+      const existingNotes = await Note.find({
+        userId,
+        clientId: { $in: incomingClientIds }
+      }).session(session);
 
-        if (!existing) {
-          // Create new
-          await new Note({
+      // Create a map for O(1) lookup
+      const existingMap = new Map(existingNotes.map(n => [n.clientId, n]));
+
+      // Prepare bulk operations
+      const bulkOps = [];
+      const newNotes = [];
+
+      for (const n of notes) {
+        if (existingMap.has(n.id)) {
+          const existing = existingMap.get(n.id);
+          const clientDate = new Date(n.updatedAt);
+
+          // Only update if client version is newer
+          if (clientDate > existing.clientUpdatedAt) {
+            bulkOps.push({
+              updateOne: {
+                filter: { _id: existing._id },
+                update: {
+                  $set: {
+                    title: n.title,
+                    content: n.content,
+                    folderId: n.folderId,
+                    tags: n.tags,
+                    pinned: n.pinned,
+                    theme: n.theme || 'default',
+                    isFullWidth: n.isFullWidth || false,
+                    clientUpdatedAt: clientDate
+                  }
+                }
+              }
+            });
+          }
+        } else {
+          // Collect new notes for batch insert
+          newNotes.push({
             userId,
             clientId: n.id,
             title: n.title,
@@ -291,42 +363,52 @@ router.post('/', auth, async (req, res) => {
             pinned: n.pinned,
             theme: n.theme || 'default',
             isFullWidth: n.isFullWidth || false,
-            clientUpdatedAt: n.updatedAt,
-          }).save();
-        } else {
-          // Compare dates
-          const clientDate = new Date(n.updatedAt);
-          if (clientDate > existing.clientUpdatedAt) {
-            existing.title = n.title;
-            existing.content = n.content;
-            existing.folderId = n.folderId;
-            existing.tags = n.tags;
-            existing.pinned = n.pinned;
-            existing.theme = n.theme || 'default';
-            existing.isFullWidth = n.isFullWidth || false;
-            existing.clientUpdatedAt = clientDate;
-            await existing.save();
-          }
+            clientUpdatedAt: n.updatedAt
+          });
         }
       }
 
-      // Explicitly soft-delete notes that were deleted on client
+      // Execute bulk update (if any)
+      if (bulkOps.length > 0) {
+        await Note.bulkWrite(bulkOps, { session });
+      }
+
+      // Insert all new notes in one batch (not N individual inserts)
+      if (newNotes.length > 0) {
+        await Note.insertMany(newNotes, { session });
+      }
+
+      // Soft-delete notes that were deleted on client
       if (deletedNoteIds.length > 0) {
         const now = new Date();
         await Note.updateMany(
           {
             userId,
             clientId: { $in: deletedNoteIds },
-            deletedAt: null // Only soft-delete if not already deleted
+            deletedAt: null
           },
-          { deletedAt: now }
+          { deletedAt: now },
+          { session }
         );
+
+        // ✅ AUDIT LOGGING: Log all deleted notes
+        for (const clientId of deletedNoteIds) {
+          await Audit.create([{
+            userId,
+            action: 'DELETE_NOTE',
+            resourceId: clientId,
+            resourceType: 'note',
+            details: { clientId, deletedAt: now },
+            ipAddress: req.ip,
+            userAgent: req.get('user-agent')
+          }], { session });
+        }
       }
     }
 
     // After push, fetch all active notes to return
-    const allNotes = await Note.find({ userId }).active();
-    const allFolders = await Folder.find({ userId });
+    const allNotes = await Note.find({ userId }).active().session(session);
+    const allFolders = await Folder.find({ userId }).session(session);
 
     // Map back to client format
     const cloudNotes = allNotes.map(n => ({
@@ -347,9 +429,17 @@ router.post('/', auth, async (req, res) => {
 
     res.json({ notes: cloudNotes, folders: cloudFolders });
 
+    // ✅ TRANSACTIONS: Commit on success
+    await session.commitTransaction();
+
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    // ✅ TRANSACTIONS: Abort on error
+    await session.abortTransaction();
+    logger.error('Sync operation failed', { error: err.message, userId });
+    res.status(500).json({ msg: 'Sync failed, please try again' });
+  } finally {
+    // ✅ Always cleanup session
+    await session.endSession();
   }
 });
 

@@ -2,7 +2,24 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const { logger, requestLogger } = require('./utils/logger');
+
+// ✅ RELIABILITY: Global error handlers for unhandled rejections (set up FIRST)
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Promise Rejection', {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined
+  });
+});
+
+process.on('uncaughtException', (error) => {
+  logger.fatal('Uncaught Exception', {
+    message: error.message,
+    stack: error.stack
+  });
+  process.exit(1);
+});
 
 const app = express();
 
@@ -35,6 +52,21 @@ app.use(cors({
 // ✅ SECURITY: Set COOP header for Firebase Auth popups
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  // ✅ SECURITY: Content Security Policy to prevent XSS
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.google-analytics.com https://cdn.tailwindcss.com; " +
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.tailwindcss.com; " +
+    "img-src 'self' data: https: blob:; " +
+    "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; " +
+    "connect-src 'self' https://firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; " +
+    "frame-src 'self' https://*.firebaseapp.com; " +
+    "object-src 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'; " +
+    "upgrade-insecure-requests;"
+  );
   next();
 });
 
@@ -43,6 +75,24 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // ✅ LOGGING: Add request logging AFTER CORS/Security
 app.use(requestLogger);
+
+// ✅ SECURITY: Rate limiting for API endpoints
+const syncLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 20, // Max 20 requests per 5 minutes
+  message: 'Too many sync requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/health' // Don't rate limit health checks
+});
+
+const shareLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 30, // Max 30 requests per 5 minutes
+  message: 'Too many share requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -113,20 +163,46 @@ connectDB();
 
 const path = require('path');
 
-// 🚨 VERCEL DIAGNOSTIC INTERCEPTOR: Prevent 15-second silent timeouts.
-// If MongoDB Atlas firewalls Vercel, actively report it rather than crashing the container!
+// 🚨 VERCEL DIAGNOSTIC: Check DB connection readiness
 app.use(async (req, res, next) => {
   if (req.path.startsWith('/api')) {
-    let attempts = 0;
-    while (mongoose.connection.readyState === 2 && attempts < 100) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      attempts++;
-    }
-    if (mongoose.connection.readyState === 0) {
-      return res.status(503).json({
-        msg: '🚨 FIREWALL ERROR: Vercel cannot reach MongoDB Atlas! You must open Atlas Network Access to 0.0.0.0/0 AND ensure MONGO_URI is properly saved in the Vercel Dashboard.',
-        code: 'MONGODB_UNREACHABLE_TIMEOUT'
-      });
+    const state = mongoose.connection.readyState;
+
+    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+    if (state !== 1) {
+      logger.warn('API request received with non-ready DB connection', { state, path: req.path });
+
+      if (state === 0) {
+        // Not connected - attempt one quick reconnect
+        if (!process.env.VERCEL) { // Local dev
+          try {
+            await connectDB();
+          } catch (e) {
+            logger.error('Reconnect attempt failed', { error: e.message });
+          }
+        }
+
+        if (mongoose.connection.readyState !== 1) {
+          return res.status(503).json({
+            msg: 'Database temporarily unavailable',
+            code: 'DB_NOT_READY'
+          });
+        }
+      } else if (state === 2) {
+        // Connecting - brief wait (max 1 second)
+        let retries = 20; // 20 * 50ms = 1 second max
+        while (mongoose.connection.readyState !== 1 && retries > 0) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+          retries--;
+        }
+
+        if (mongoose.connection.readyState !== 1) {
+          return res.status(503).json({
+            msg: 'Database connection timeout',
+            code: 'DB_CONNECTION_TIMEOUT'
+          });
+        }
+      }
     }
   }
   next();
@@ -134,9 +210,9 @@ app.use(async (req, res, next) => {
 
 // Define Routes
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/sync', require('./routes/sync'));
-app.use('/api/share', require('./routes/share')); // ✅ Sharing endpoints
-app.use('/api/ai', require('./routes/ai')); // ✅ Smart AI endpoints
+app.use('/api/sync', syncLimiter, require('./routes/sync'));
+app.use('/api/share', shareLimiter, require('./routes/share')); // ✅ Sharing endpoints with rate limiting
+app.use('/api/ai', require('./routes/ai')); // ✅ Smart AI endpoints (has own rate limiting)
 
 // ✅ PRO CACHING: Aggressive Browser-Level Caching for Static Assets
 const staticOptions = {

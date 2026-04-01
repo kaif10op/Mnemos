@@ -35,14 +35,18 @@ const ShareSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Index for user lookups
-ShareSchema.index({ userId: 1 });
+// ✅ PERFORMANCE: Indexes for common queries
+ShareSchema.index({ userId: 1 }); // Find user's shares
+ShareSchema.index({ token: 1 }, { unique: true }); // Find by share token (unique)
+ShareSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index for auto-deletion of expired shares
+ShareSchema.index({ userId: 1, noteId: 1 }); // Find existing share for a note
 
 // Query helper: exclude expired shares
 ShareSchema.query.active = function() {
-  return this.where({
-    expiresAt: { $exists: false } || { $gt: new Date() }
-  });
+  return this.or([
+    { expiresAt: null },
+    { expiresAt: { $gt: new Date() } }
+  ]);
 };
 
 module.exports = mongoose.model('Share', ShareSchema);

@@ -3,25 +3,23 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const Note = require('../models/Note');
 const Share = require('../models/Share');
+const { validate } = require('../utils/validation');
+const { logger } = require('../utils/logger');
 
 // @route   POST api/share/:noteId
 // @desc    Create a share link for a note (generate or get existing)
 // @access  Private
-router.post('/:noteId', auth, async (req, res) => {
+router.post('/:noteId', auth, validate('shareNote'), async (req, res) => {
   const userId = req.user.id;
   const { noteId } = req.params;
   const { expiresIn, title, content, tags } = req.body; // Accept note data for auto-create
 
   try {
-    console.log('[SHARE] POST request:', { userId, noteId, bodyKeys: Object.keys(req.body), title: typeof title, content: typeof content });
-
     // Verify the note belongs to the user
     let note = await Note.findOne({ userId, clientId: noteId });
-    console.log('[SHARE] Note found in DB:', !!note);
 
     // If note not in DB yet (not synced), create it on the fly
     if (!note && (title !== undefined || content !== undefined)) {
-      console.log('[SHARE] Auto-creating note in DB...');
       note = new Note({
         userId,
         clientId: noteId,
@@ -33,11 +31,9 @@ router.post('/:noteId', auth, async (req, res) => {
         clientUpdatedAt: new Date(),
       });
       await note.save();
-      console.log('[SHARE] Note created successfully:', note._id);
     }
 
     if (!note) {
-      console.log('[SHARE] Note not found and no body data to create it');
       return res.status(404).json({ msg: 'Note not found. Please sync your notes first.' });
     }
 
@@ -73,7 +69,7 @@ router.post('/:noteId', auth, async (req, res) => {
       expiresAt: share.expiresAt
     });
   } catch (err) {
-    console.error(err.message);
+    logger.error('Share creation failed', { error: err.message, userId, noteId });
     res.status(500).json({ msg: 'Server Error' });
   }
 });
@@ -121,7 +117,7 @@ router.get('/:token', async (req, res) => {
       sharedAt: share.createdAt
     });
   } catch (err) {
-    console.error(err.message);
+    logger.error('Share retrieval failed', { error: err.message, token: req.params.token });
     res.status(500).json({ msg: 'Server Error' });
   }
 });
@@ -148,7 +144,7 @@ router.get('/shares/list', auth, async (req, res) => {
 
     res.json({ shares: sharesList });
   } catch (err) {
-    console.error(err.message);
+    logger.error('Share list retrieval failed', { error: err.message, userId });
     res.status(500).json({ msg: 'Server Error' });
   }
 });
@@ -170,7 +166,7 @@ router.delete('/:token', auth, async (req, res) => {
     await Share.deleteOne({ _id: share._id });
     res.json({ msg: 'Share revoked' });
   } catch (err) {
-    console.error(err.message);
+    logger.error('Share deletion failed', { error: err.message, userId, token });
     res.status(500).json({ msg: 'Server Error' });
   }
 });

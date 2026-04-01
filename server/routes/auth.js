@@ -6,6 +6,13 @@ const rateLimit = require('express-rate-limit');
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { validate } = require('../utils/validation');
+const { logger } = require('../utils/logger');
+
+// ✅ SECURITY: Ensure JWT_SECRET is configured (fail fast on startup)
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('CRITICAL: JWT_SECRET environment variable is not set. This is required for production.');
+}
 
 // ✅ SECURITY: Rate limiting for auth endpoints
 const authLimiter = rateLimit({
@@ -47,12 +54,12 @@ router.post('/register', authLimiter, validate('register'), async (req, res) => 
 
     const token = jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'mnemos_secret_key_123',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
     res.json({ token, user: { id: user.id, email: user.email } });
   } catch (err) {
-    console.error(err.message);
+    logger.error('Registration failed', { error: err.message, email: req.body.email });
     res.status(500).json({ msg: 'Server error during registration' });
   }
 });
@@ -84,12 +91,12 @@ router.post('/login', authLimiter, validate('login'), async (req, res) => {
 
     const token = jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'mnemos_secret_key_123',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
     res.json({ token, user: { id: user.id, email: user.email } });
   } catch (err) {
-    console.error(err.message);
+    logger.error('Login failed', { error: err.message, email: req.body.email });
     res.status(500).json({ msg: 'Server error during login' });
   }
 });
@@ -108,27 +115,24 @@ router.post('/google', async (req, res) => {
     // 🛡️ VERIFY Firebase ID Token
     // Firebase ID Tokens are JWTs signed by Google.
     const decodedToken = jwt.decode(idToken);
-    
+
     if (!decodedToken) {
-      console.error('❌ Google Auth Error: JWT decode failed');
+      logger.error('Google Auth: JWT decode failed', { hasToken: !!idToken });
       return res.status(400).json({ msg: 'Invalid token format' });
     }
 
-    // 🧪 DEBUG: Log payload to see structure in development
-    console.log('🔍 Firebase Token Payload:', JSON.stringify(decodedToken, null, 2));
-
     let email = (decodedToken.email || decodedToken.user_email || decodedToken.firebase?.identities?.email?.[0] || clientEmail)?.toLowerCase();
-    
+
     if (!email && decodedToken.sub) {
       // 📛 PERSONALIZED FALLBACK: Use Name or Username if Email is hidden
       const name = (decodedToken.name || decodedToken.preferred_username || decodedToken.given_name || 'Member').replace(/\s+/g, '');
       const uniqueId = decodedToken.sub.substring(0, 8);
       email = `${name}_${uniqueId}@mnemos-social.local`.toLowerCase();
-      console.warn('⚠️ Google Auth: Using human-readable fallback identity:', email);
+      logger.info('Google Auth: Using fallback identity', { email });
     }
-    
+
     if (!email) {
-      console.error('❌ Google Auth Error: Identity missing from token payload');
+      logger.error('Google Auth: Identity missing from token payload');
       return res.status(400).json({ msg: 'Token missing identity' });
     }
 
@@ -152,12 +156,12 @@ router.post('/google', async (req, res) => {
 
     const token = jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'mnemos_secret_key_123',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
     res.json({ token, user: { id: user.id, email: user.email } });
   } catch (err) {
-    console.error('Google Auth Error:', err.message);
+    logger.error('Google authentication failed', { error: err.message });
     res.status(500).json({ msg: 'Google Authentication Error' });
   }
 });
@@ -170,7 +174,7 @@ router.get('/me', auth, async (req, res) => {
     const user = await User.findById(req.user.id).select('-password');
     res.json(user);
   } catch (err) {
-    console.error(err.message);
+    logger.error('User retrieval failed', { error: err.message, userId: req.user.id });
     res.status(500).json({ msg: 'Server error' });
   }
 });

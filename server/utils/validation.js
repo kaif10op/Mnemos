@@ -70,6 +70,23 @@ const schemas = {
         })
       )
       .optional()
+  }),
+
+  shareNote: joi.object({
+    title: joi
+      .string()
+      .max(500)
+      .allow('')
+      .optional(),
+    content: joi
+      .string()
+      .max(50000)
+      .allow('')
+      .optional(),
+    tags: joi
+      .array()
+      .items(joi.string().max(100))
+      .optional()
   })
 };
 

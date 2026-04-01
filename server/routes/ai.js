@@ -6,6 +6,7 @@ const Note = require('../models/Note');
 const Share = require('../models/Share');
 const NodeCache = require('node-cache');
 const crypto = require('crypto');
+const { logger } = require('../utils/logger');
 
 // Setup response cache (5 minute TTL)
 const aiCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
@@ -117,11 +118,11 @@ async function askAI(systemPrompt, userPrompt, temperature = 0.5, maxTokens = 40
       }
 
       if (!responseText) throw new Error('Empty response');
-      console.log(`[AI] Success with ${provider.name}`);
+      logger.debug('AI provider succeeded', { provider: provider.name });
       return responseText.trim();
 
     } catch (err) {
-      console.error(`[AI] ${provider.name} failed:`, err.message);
+      logger.debug('AI provider failed', { provider: provider.name, error: err.message });
       errors.push(`${provider.name}: ${err.message}`);
     }
   }

@@ -1,5 +1,11 @@
 const jwt = require('jsonwebtoken');
 
+// Ensure JWT_SECRET is configured (fail fast on startup)
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('CRITICAL: JWT_SECRET environment variable is not set. This is required for production.');
+}
+
 module.exports = function (req, res, next) {
   // Get token from header
   const token = req.header('Authorization')?.split(' ')[1];
@@ -11,7 +17,7 @@ module.exports = function (req, res, next) {
 
   // Verify token
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'mnemos_secret_key_123');
+    const decoded = jwt.verify(token, JWT_SECRET);
 
     req.user = decoded.user;
     next();
