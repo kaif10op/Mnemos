@@ -17,6 +17,7 @@
       if (isAiOpen) return;
       isAiOpen = true;
       document.getElementById('ai-panel')?.classList.add('open');
+      document.body.classList.add('ai-panel-active');
       const input = document.getElementById('ai-input');
       if (input) {
         setTimeout(() => input.focus(), 300);
@@ -27,6 +28,7 @@
       if (!isAiOpen) return;
       isAiOpen = false;
       document.getElementById('ai-panel')?.classList.remove('open');
+      document.body.classList.remove('ai-panel-active');
       document.getElementById('editor-view')?.focus();
     },
 
