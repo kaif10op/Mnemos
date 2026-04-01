@@ -9,6 +9,10 @@
   --bg-tertiary: #27272a;  /* zinc-800 */
   --bg-elevated: #27272a;
 
+  /* ── Editor-specific backgrounds for visual distinction ── */
+  --editor-bg-primary: #0f0f12;   /* Slightly lighter than primary for editor */
+  --editor-bg-secondary: #1f1f26; /* Distinct secondary for editor elements */
+
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
   --text-tertiary: #71717a;
@@ -80,6 +84,9 @@
   /* ── Glassmorphism ── */
   --glass-blur: 20px;
   --glass-border: rgba(255, 255, 255, 0.08);
+  --bg-glass: rgba(20, 20, 24, 0.4);
+  --bg-glass-hover: rgba(255, 255, 255, 0.08);
+  --bg-glass-active: rgba(99, 102, 241, 0.12);
 
   /* ── Transitions ── */
   --transition-fast: 100ms ease-in-out;
@@ -109,6 +116,10 @@
   --bg-tertiary: #e4e4e7;  /* zinc-200 */
   --bg-elevated: #ffffff;
 
+  /* ── Editor-specific backgrounds for light theme ── */
+  --editor-bg-primary: #f9f9fb;   /* Subtle off-white for editor */
+  --editor-bg-secondary: #f0f0f4; /* Distinct secondary for editor elements */
+
   --text-primary: #09090b; /* zinc-950 */
   --text-secondary: #52525b; /* zinc-600 */
   --text-tertiary: #a1a1aa; /* zinc-400 */
@@ -129,4 +140,7 @@
   --shadow-xl: 0 20px 40px rgba(0,0,0,0.12);
   --glass-border: rgba(0, 0, 0, 0.05);
   --shadow-inset: none;
+  --bg-glass: rgba(245, 245, 247, 0.5);
+  --bg-glass-hover: rgba(0, 0, 0, 0.04);
+  --bg-glass-active: rgba(79, 70, 229, 0.08);
 }

@@ -49,12 +49,13 @@
 
 .editor-panel {
   grid-column: 3;
-  background: var(--bg-primary);
+  background: var(--editor-bg-primary);
   display: flex;
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
   transition: background var(--transition-slow);
+  border-left: 1px solid var(--border-default);
 }
 
 /* ── Mobile overlay ── */

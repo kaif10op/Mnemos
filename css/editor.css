@@ -6,12 +6,12 @@
 /* ── Editor Header — Ultra-Compact ── */
 .editor-header {
   padding: 6px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid var(--border-default);
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  background: transparent;
+  background: var(--editor-bg-secondary);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -82,8 +82,8 @@
 .editor-toolbar {
   margin: 0;
   padding: 3px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  background: rgba(20, 20, 24, 0.6);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--editor-bg-secondary);
   display: flex;
   align-items: center;
   gap: 1px;
@@ -258,6 +258,7 @@
   padding: 8px 16px 24px;
   display: flex;
   flex-direction: column;
+  background: var(--editor-bg-primary);
 }
 
 .editor-body {
@@ -455,7 +456,7 @@
 /* ── Editor Footer ── */
 .editor-footer {
   padding: 2px 16px;
-  border-top: 1px solid rgba(255,255,255,0.04);
+  border-top: 1px solid var(--border-default);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -465,7 +466,7 @@
   text-transform: uppercase;
   font-weight: 500;
   color: var(--text-tertiary);
-  background: transparent;
+  background: var(--editor-bg-secondary);
   z-index: 10;
   height: 24px;
 }
