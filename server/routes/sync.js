@@ -307,14 +307,14 @@ router.post('/', auth, validate('syncData'), async (req, res) => {
       if (newFolders.length > 0) {
         await Folder.insertMany(newFolders, { session });
       }
+    }
 
-      // Delete folders that were deleted on client
-      if (deletedFolderIds.length > 0) {
-        await Folder.deleteMany({
-          userId,
-          clientId: { $in: deletedFolderIds }
-        }, { session });
-      }
+    // ✅ ROBUST: Delete folders regardless of incoming 'folders' array
+    if (deletedFolderIds && deletedFolderIds.length > 0) {
+      await Folder.deleteMany({
+        userId,
+        clientId: { $in: deletedFolderIds }
+      }, { session });
     }
 
     // =======================
@@ -387,32 +387,32 @@ router.post('/', auth, validate('syncData'), async (req, res) => {
       if (newNotes.length > 0) {
         await Note.insertMany(newNotes, { session });
       }
+    }
 
-      // Soft-delete notes that were deleted on client
-      if (deletedNoteIds.length > 0) {
-        const now = new Date();
-        await Note.updateMany(
-          {
-            userId,
-            clientId: { $in: deletedNoteIds },
-            deletedAt: null
-          },
-          { deletedAt: now },
-          { session }
-        );
+    // ✅ ROBUST: Handle soft-deletions independently
+    if (deletedNoteIds && deletedNoteIds.length > 0) {
+      const now = new Date();
+      await Note.updateMany(
+        {
+          userId,
+          clientId: { $in: deletedNoteIds },
+          deletedAt: null
+        },
+        { deletedAt: now },
+        { session }
+      );
 
-        // ✅ AUDIT LOGGING: Log all deleted notes
-        for (const clientId of deletedNoteIds) {
-          await Audit.create([{
-            userId,
-            action: 'DELETE_NOTE',
-            resourceId: clientId,
-            resourceType: 'note',
-            details: { clientId, deletedAt: now },
-            ipAddress: req.ip,
-            userAgent: req.get('user-agent')
-          }], { session });
-        }
+      // ✅ AUDIT LOGGING: Log all deleted notes
+      for (const clientId of deletedNoteIds) {
+        await Audit.create([{
+          userId,
+          action: 'DELETE_NOTE',
+          resourceId: clientId,
+          resourceType: 'note',
+          details: { clientId, deletedAt: now },
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent')
+        }], { session });
       }
     }
 

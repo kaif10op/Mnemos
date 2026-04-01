@@ -512,24 +512,27 @@ async function syncWithCloud() {
     saveDeletedFolders(currentDeletedFolders.filter(id => !deletedFolderIds.includes(id)));
 
     // Merge any remote response seamlessly
-    const currentNotes = getAllNotes();
-    const currentFolders = getAllFolders();
+    // ✅ SYNC OVERWRITE: For folders, the server's response is the absolute truth.
+    // This prunes any folders that were deleted on other devices.
+    const currentFolders = data.folders || [];
+    
+    // For notes, we merge based on updatedAt to avoid overwriting newer local changes
+    let currentNotes = getAllNotes();
+    const serverDeletedNoteIds = data.deletedNoteIds || [];
 
+    // 1. Prune notes that the server says are deleted
+    currentNotes = currentNotes.filter(n => !serverDeletedNoteIds.includes(n.id));
+
+    // 2. Merge incoming updates
     (data.notes || []).forEach(incoming => {
       const idx = currentNotes.findIndex(n => n.id === incoming.id);
       if (idx === -1) {
-        currentNotes.push(incoming);
+        // Only add if it's not in our local deleted queue (safety)
+        if (!getDeletedNotes().includes(incoming.id)) {
+          currentNotes.push(incoming);
+        }
       } else if (new Date(incoming.updatedAt) > new Date(currentNotes[idx].updatedAt)) {
         currentNotes[idx] = { ...currentNotes[idx], ...incoming };
-      }
-    });
-
-    (data.folders || []).forEach(incoming => {
-      const idx = currentFolders.findIndex(f => f.id === incoming.id);
-      if (idx === -1) {
-        currentFolders.push(incoming);
-      } else {
-        currentFolders[idx] = { ...currentFolders[idx], ...incoming };
       }
     });
 
