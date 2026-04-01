@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const auth = require('../middleware/auth');
+const Note = require('../models/Note');
+const Share = require('../models/Share');
 const NodeCache = require('node-cache');
 const crypto = require('crypto');
 
@@ -505,6 +507,59 @@ router.post('/mindmap', auth, aiLimiter, async (req, res) => {
     res.json({ mermaid });
   } catch (error) {
     res.status(500).json({ msg: 'Mindmap generation failed', details: error.message });
+  }
+});
+
+// ============================================================
+// PUBLIC SHARE NOTE SUMMARY (RAG API)
+// ============================================================
+// @route   POST api/ai/public/summarize
+// @desc    Generate a formatted summary exclusively for a public shared note.
+// @access  Public (Requires Token)
+router.post('/public/summarize', aiLimiter, async (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return res.status(400).json({ msg: 'Token is required' });
+  }
+
+  try {
+    // 1. Verify Share Token
+    const share = await Share.findOne({ token });
+    if (!share) return res.status(404).json({ msg: 'Invalid or expired share token' });
+    if (share.expiresAt && share.expiresAt < new Date()) {
+      return res.status(404).json({ msg: 'Share link has expired' });
+    }
+
+    // 2. Fetch Note
+    const note = await Note.findById(share.noteId);
+    if (!note || note.deletedAt !== null) {
+      return res.status(404).json({ msg: 'Note no longer exists' });
+    }
+
+    // 3. Prepare Constraints
+    const cleanContent = note.content.replace(/<[^>]*>?/gm, ' ').slice(0, 15000); // Strip HTML, cap chars
+    const systemPrompt = `You are a sophisticated document summarizer reading a shared note online. 
+CRITICAL OUTPUT RULES:
+1. Provide a concise, highly readable summary of the document below.
+2. Structure the summary beautifully using basic HTML: <h3>, <p>, <ul>, <li>, and <strong>. 
+3. DO NOT wrap the output in markdown code blocks like \`\`\`html. Output raw HTML directly.
+4. Do not include introductory conversational fluff like "Here is the summary:" or "Based on the text:". Start directly with your summarized findings.
+
+--- DOCUMENT TO SUMMARIZE (${note.title}) ---
+${cleanContent}
+--------------------------------`;
+
+    const userPrompt = `Summarize the attached document following all HTML formatting rules.`;
+
+    // 4. Query AI
+    const response = await askAI(systemPrompt, userPrompt, 0.4); 
+    let sanitizedHtml = response.replace(/```html/gi, '').replace(/```/g, '').trim();
+
+    res.json({ html: sanitizedHtml });
+  } catch (error) {
+    console.error('[AI PUBLIC SUMMARIZE ERR]', error.message);
+    res.status(500).json({ msg: 'Summary generation failed', details: error.message });
   }
 });
 

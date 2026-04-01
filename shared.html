@@ -44,6 +44,10 @@
   <link rel="stylesheet" href="css/editor.css" />
 
   <style>
+    body {
+      overflow-y: auto;
+    }
+
     .shared-viewer {
       max-width: 900px;
       margin: 0 auto;
@@ -179,6 +183,63 @@
     .home-link:hover {
       text-decoration: underline;
     }
+
+    /* Public AI Summarize Styles */
+    .public-summary-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 12px;
+      padding: 8px 16px;
+      background: rgba(99, 102, 241, 0.1);
+      color: var(--accent-primary);
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all var(--transition-base);
+    }
+    .public-summary-btn:hover {
+      background: rgba(99, 102, 241, 0.2);
+    }
+    .public-summary-btn.loading {
+      cursor: wait;
+      opacity: 0.7;
+    }
+    .public-summary-container {
+      display: none;
+      margin-bottom: 24px;
+      background: linear-gradient(145deg, rgba(30,30,35,0.6), rgba(20,20,25,0.8));
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-left: 3px solid var(--accent-primary);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      color: var(--text-primary);
+      animation: slideDown 0.3s ease-out;
+      line-height: 1.6;
+    }
+    .public-summary-container h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 0;
+      margin-bottom: 16px;
+      color: var(--accent-primary);
+      font-size: 16px;
+    }
+    .public-summary-container ul {
+      margin-left: 20px;
+      margin-bottom: 16px;
+    }
+    .public-summary-container p {
+      margin-bottom: 16px;
+    }
+    .public-summary-container p:last-child {
+      margin-bottom: 0;
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
@@ -204,7 +265,12 @@
 
     <div id="content" style="display: none;">
       <div class="shared-header">
-        <h1 id="note-title">Untitled</h1>
+        <div>
+          <h1 id="note-title">Untitled</h1>
+          <button id="generate-summary-btn" class="public-summary-btn">
+            <i class="ph-bold ph-sparkle"></i> Generate AI Summary
+          </button>
+        </div>
         <div class="shared-meta">
           <span id="meta-views" title="Number of times viewed">
             <i class="ph-duotone ph-eye"></i> <span id="views-count">0</span> views
@@ -213,6 +279,11 @@
             <i class="ph-duotone ph-link"></i> <span id="shared-date">-</span>
           </span>
         </div>
+      </div>
+      
+      <div id="summary-container" class="public-summary-container">
+        <h3><i class="ph-fill ph-magic-wand"></i> TL;DR AI Summary</h3>
+        <div id="summary-content"></div>
       </div>
 
       <div class="shared-content" id="note-content"></div>
@@ -261,6 +332,9 @@
         contentEl.innerHTML = DOMPurify.sanitize(note.content || '');
         viewsEl.textContent = note.views || 0;
 
+        // Smart Render Mermaids
+        setTimeout(() => renderMermaidDiagrams(contentEl), 100);
+
         // Format date
         const sharedDate = new Date(note.sharedAt);
         dateEl.textContent = sharedDate.toLocaleDateString('en-US', {
@@ -306,6 +380,72 @@
 
     // Load on page load
     window.addEventListener('load', loadSharedNote);
+
+    /* ── Smart Rendering Engine (Mermaid) ── */
+    async function renderMermaidDiagrams(container) {
+      if (!window.mermaid) return;
+      
+      // Hide all editor action buttons (read-only view)
+      container.querySelectorAll('.mermaid-actions').forEach(el => el.style.display = 'none');
+      
+      const blocks = container.querySelectorAll('.mermaid-block');
+      for (const block of blocks) {
+        const source = block.querySelector('.mermaid-source');
+        const preview = block.querySelector('.mermaid-preview');
+        if (!source || !preview) continue;
+
+        const code = source.textContent.replace(/\\n/g, '\n').trim();
+        if (!code) continue;
+
+        try {
+          const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
+          const { svg } = await mermaid.render(id, code);
+          preview.innerHTML = svg;
+          preview.style.display = 'block';
+          source.style.display = 'none';
+        } catch (err) {
+          preview.innerHTML = `<div style="color:#ef4444; padding:8px; font-size:13px; background:rgba(239, 68, 68, 0.1); border-radius:4px;">⚠️ Diagram Error: ${err.message || 'Invalid diagram syntax'}</div>`;
+          preview.style.display = 'block';
+          source.style.display = 'none';
+        }
+      }
+    }
+
+    /* ── Public AI Summary Logic ── */
+    const summaryBtn = document.getElementById('generate-summary-btn');
+    const summaryContainer = document.getElementById('summary-container');
+    const summaryContent = document.getElementById('summary-content');
+
+    summaryBtn.addEventListener('click', async () => {
+      // Prevent double clicking
+      if (summaryBtn.classList.contains('loading')) return;
+
+      summaryBtn.classList.add('loading');
+      summaryBtn.innerHTML = '<i class="ph-bold ph-circle-notch ph-spin"></i> Generating...';
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/ai/public/summarize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.msg || 'Error generating summary');
+        }
+
+        summaryContent.innerHTML = DOMPurify.sanitize(data.html);
+        summaryContainer.style.display = 'block';
+        summaryBtn.style.display = 'none'; // Hide button after generating
+      } catch (err) {
+        summaryBtn.classList.remove('loading');
+        summaryBtn.innerHTML = '<i class="ph-bold ph-sparkle"></i> Try Again';
+        alert('Could not generate summary: ' + err.message);
+      }
+    });
+
   </script>
 </body>
 </html>
