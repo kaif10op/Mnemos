@@ -1,6 +1,26 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P6LF4BQX');</script>
+  <!-- End Google Tag Manager -->
+  
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZEETZ5KD0F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-ZEETZ5KD0F');
+  </script>
+
+  <!-- Consent Manager Auto-Blocking -->
+  <script type="text/javascript" data-cmp-ab="1" src="https://cdn.consentmanager.net/delivery/autoblocking/31c894bb52ac9.js" data-cmp-host="a.delivery.consentmanager.net" data-cmp-cdn="cdn.consentmanager.net" data-cmp-codesrc="16"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Notes Saver — A premium workspace." />
@@ -19,10 +39,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <!-- Premium Phosphor Icons -->
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script data-cmp-ab="1" src="https://unpkg.com/@phosphor-icons/web"></script>
 
   <!-- DOMPurify for HTML sanitization -->
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+  <script data-cmp-ab="1" src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+
+  <!-- Mermaid.js for live diagram rendering -->
+  <script data-cmp-ab="1" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script data-cmp-ab="1">document.addEventListener('DOMContentLoaded', () => { mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' }); });</script>
 
   <!-- Stylesheets -->
   <link rel="stylesheet" href="css/variables.css" />
@@ -37,6 +61,10 @@
   <link rel="stylesheet" href="css/ai-panel.css" />
 </head>
 <body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P6LF4BQX"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
 
   <!-- Mobile Menu Button -->
   <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle sidebar">
@@ -252,67 +280,67 @@
           </div>
         </div>
 
-        <!-- Toolbar -->
+        <!-- Unified Compact Toolbar -->
         <div class="editor-toolbar" role="toolbar" aria-label="Formatting options">
-          <!-- Undo/Redo -->
-          <button class="toolbar-btn" data-command="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><i class="ph-bold ph-arrow-u-up-left" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" data-command="redo" title="Redo (Ctrl+Y)" aria-label="Redo"><i class="ph-bold ph-arrow-u-up-right" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" data-command="undo" title="Undo" aria-label="Undo"><i class="ph-bold ph-arrow-u-up-left"></i></button>
+          <button class="toolbar-btn" data-command="redo" title="Redo" aria-label="Redo"><i class="ph-bold ph-arrow-u-up-right"></i></button>
           <div class="toolbar-divider"></div>
-
-          <select class="toolbar-select" id="heading-select" title="Heading level" aria-label="Select heading level">
-            <option value="">Text Level</option>
-            <option value="h1">Heading 1</option>
-            <option value="h2">Heading 2</option>
-            <option value="h3">Heading 3</option>
-            <option value="p">Paragraph</option>
+          <select class="toolbar-select" id="heading-select" title="Heading" aria-label="Heading">
+            <option value="">Heading</option>
+            <option value="h1">H1</option>
+            <option value="h2">H2</option>
+            <option value="h3">H3</option>
+            <option value="p">¶</option>
+          </select>
+          <select class="toolbar-select" id="font-size-select" title="Font Size" aria-label="Font size">
+            <option value="">Size</option>
+            <option value="1">XS</option>
+            <option value="2">S</option>
+            <option value="3">M</option>
+            <option value="4">L</option>
+            <option value="5">XL</option>
+            <option value="6">2XL</option>
+            <option value="7">3XL</option>
           </select>
           <div class="toolbar-divider"></div>
-
-          <!-- Basic Format -->
-          <button class="toolbar-btn" data-command="bold" title="Bold (Ctrl+B)" aria-label="Bold"><i class="ph-bold ph-text-b" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" data-command="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i class="ph-bold ph-text-italic" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" data-command="underline" title="Underline (Ctrl+U)" aria-label="Underline"><i class="ph-bold ph-text-underline" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" data-command="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><i class="ph-bold ph-text-strikethrough" style="font-size: 16px;"></i></button>
-          
+          <button class="toolbar-btn" data-command="bold" title="Bold" aria-label="Bold"><i class="ph-bold ph-text-b"></i></button>
+          <button class="toolbar-btn" data-command="italic" title="Italic" aria-label="Italic"><i class="ph-bold ph-text-italic"></i></button>
+          <button class="toolbar-btn" data-command="underline" title="Underline" aria-label="Underline"><i class="ph-bold ph-text-underline"></i></button>
+          <button class="toolbar-btn" data-command="strikeThrough" title="Strike" aria-label="Strike"><i class="ph-bold ph-text-strikethrough"></i></button>
+          <button class="toolbar-btn" data-command="superscript" title="Superscript" aria-label="Superscript"><i class="ph-bold ph-text-superscript"></i></button>
+          <button class="toolbar-btn" data-command="subscript" title="Subscript" aria-label="Subscript"><i class="ph-bold ph-text-subscript"></i></button>
           <div class="toolbar-divider"></div>
-
-          <!-- Alignment -->
-          <button class="toolbar-btn" data-command="justifyLeft" title="Align Left" aria-label="Align Left"><i class="ph-bold ph-text-align-left" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" data-command="justifyCenter" title="Align Center" aria-label="Align Center"><i class="ph-bold ph-text-align-center" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" data-command="justifyRight" title="Align Right" aria-label="Align Right"><i class="ph-bold ph-text-align-right" style="font-size: 16px;"></i></button>
-          
+          <button class="toolbar-btn" id="text-color-btn" title="Text Color" aria-label="Text Color"><i class="ph-bold ph-palette" style="color:var(--accent-primary);"></i></button>
+          <button class="toolbar-btn" id="bg-color-btn" title="Highlight" aria-label="Highlight"><i class="ph-bold ph-highlighter-circle" style="color:var(--accent-warning);"></i></button>
+          <input type="color" id="text-color-input" style="display:none;" />
+          <input type="color" id="bg-color-input" style="display:none;" />
           <div class="toolbar-divider"></div>
-
-          <!-- Color Lookups -->
-          <button class="toolbar-btn" id="text-color-btn" title="Text Color" aria-label="Text Color"><i class="ph-bold ph-palette" style="font-size: 16px; color: var(--accent-primary);"></i></button>
-          <button class="toolbar-btn" id="bg-color-btn" title="Highlight Color" aria-label="Highlight Color"><i class="ph-bold ph-highlighter-circle" style="font-size: 16px; color: var(--accent-warning);"></i></button>
-          <input type="color" id="text-color-input" style="display: none;" />
-          <input type="color" id="bg-color-input" style="display: none;" />
-
+          <button class="toolbar-btn" data-command="justifyLeft" title="Left" aria-label="Left"><i class="ph-bold ph-text-align-left"></i></button>
+          <button class="toolbar-btn" data-command="justifyCenter" title="Center" aria-label="Center"><i class="ph-bold ph-text-align-center"></i></button>
+          <button class="toolbar-btn" data-command="justifyRight" title="Right" aria-label="Right"><i class="ph-bold ph-text-align-right"></i></button>
           <div class="toolbar-divider"></div>
-
-          <!-- Lists & Blocks -->
-          <button class="toolbar-btn" data-command="insertUnorderedList" title="Bullet list" aria-label="Bullet list"><i class="ph-bold ph-list-bullets" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" data-command="insertOrderedList" title="Numbered list" aria-label="Numbered list"><i class="ph-bold ph-list-numbers" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Quote" aria-label="Quote"><i class="ph-bold ph-quotes" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" data-command="formatBlock" data-value="pre" title="Code block" aria-label="Code block"><i class="ph-bold ph-code" style="font-size: 16px;"></i></button>
-          
+          <button class="toolbar-btn" data-command="insertUnorderedList" title="Bullets" aria-label="Bullets"><i class="ph-bold ph-list-bullets"></i></button>
+          <button class="toolbar-btn" data-command="insertOrderedList" title="Numbers" aria-label="Numbers"><i class="ph-bold ph-list-numbers"></i></button>
+          <button class="toolbar-btn" data-command="indent" title="Indent" aria-label="Indent"><i class="ph-bold ph-text-indent"></i></button>
+          <button class="toolbar-btn" data-command="outdent" title="Outdent" aria-label="Outdent"><i class="ph-bold ph-text-outdent"></i></button>
           <div class="toolbar-divider"></div>
-
-          <!-- Inserts -->
-          <button class="toolbar-btn" data-command="createLink" title="Insert link" aria-label="Insert link"><i class="ph-bold ph-link" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" id="insert-table-btn" title="Insert table" aria-label="Insert table"><i class="ph-bold ph-table" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" id="insert-image-btn" title="Insert image" aria-label="Insert image"><i class="ph-bold ph-image" style="font-size: 16px;"></i></button>
-          <input type="file" id="image-upload-input" accept="image/*" style="display: none;" aria-hidden="true" />
-          
+          <button class="toolbar-btn" data-command="createLink" title="Link" aria-label="Link"><i class="ph-bold ph-link"></i></button>
+          <button class="toolbar-btn" id="insert-table-btn" title="Table" aria-label="Table"><i class="ph-bold ph-table"></i></button>
+          <button class="toolbar-btn" id="insert-image-btn" title="Image" aria-label="Image"><i class="ph-bold ph-image"></i></button>
+          <input type="file" id="image-upload-input" accept="image/*" style="display:none;" aria-hidden="true" />
+          <button class="toolbar-btn" data-command="insertHorizontalRule" title="Divider" aria-label="Divider"><i class="ph-bold ph-minus"></i></button>
           <div class="toolbar-divider"></div>
-
-          <!-- Utilities -->
-          <button class="toolbar-btn" data-command="insertHorizontalRule" title="Horizontal rule" aria-label="Insert horizontal rule"><i class="ph-bold ph-minus" style="font-size: 16px;"></i></button>
-          <button class="toolbar-btn" data-command="removeFormat" title="Clear formatting" aria-label="Clear formatting"><i class="ph-bold ph-eraser" style="font-size: 16px;"></i></button>
+          <button class="toolbar-btn" id="paper-theme-btn" title="Paper" aria-label="Paper"><i class="ph-bold ph-note"></i></button>
+          <button class="toolbar-btn" data-command="removeFormat" title="Clear" aria-label="Clear"><i class="ph-bold ph-eraser"></i></button>
+          <button class="toolbar-btn" id="print-btn" title="Print" aria-label="Print"><i class="ph-bold ph-printer"></i></button>
         </div>
 
-        <!-- Title -->
+        <!-- Table Grid Picker (hidden by default) -->
+        <div id="table-grid-picker" class="table-grid-picker" style="display:none;">
+          <div class="table-grid-picker-header">Insert Table</div>
+          <div class="table-grid-cells" id="table-grid-cells"></div>
+          <div class="table-grid-label" id="table-grid-label">0 × 0</div>
+        </div>
         <div class="editor-title-wrapper" style="display:flex; align-items:center; gap:8px;">
           <input
             type="text"

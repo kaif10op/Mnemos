@@ -16,6 +16,9 @@
     open() {
       if (isAiOpen) return;
       isAiOpen = true;
+      if (window.Editor && window.Editor._saveSelection) {
+        window.Editor._saveSelection(); // Capture cursor position before AI panel steals focus
+      }
       document.getElementById('ai-panel')?.classList.add('open');
       document.body.classList.add('ai-panel-active');
       const input = document.getElementById('ai-input');
@@ -676,11 +679,34 @@
        }
 
        if (action === 'INSERT_MERMAID') {
-          // Render mermaid diagram in the existing modal
           const mermaidCode = text || '';
-          if (mermaidCode && window.AIPanel._renderMindMapUI) {
-             window.AIPanel._renderMindMapUI(mermaidCode);
-             window.showToast('🤖 Mermaid diagram generated', 'success');
+          if (mermaidCode) {
+             const safeCode = mermaidCode.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+             const html = `
+               <div class="mermaid-block" contenteditable="false">
+                 <div class="mermaid-source" contenteditable="true" spellcheck="false">${safeCode}</div>
+                 <div class="mermaid-preview" style="display:none;"></div>
+                 <div class="mermaid-actions" style="display:flex;">
+                   <button class="mermaid-render-btn" onclick="window.Editor._renderSingleMermaid(this.closest('.mermaid-block'))">▶ Render Diagram</button>
+                 </div>
+               </div><p>&nbsp;</p>
+             `;
+             
+             if (window.Editor) {
+                if (window.Editor._restoreSelection) window.Editor._restoreSelection();
+                document.execCommand('insertHTML', false, html);
+                setTimeout(() => {
+                   const blocks = document.querySelectorAll('.mermaid-block');
+                   if (blocks.length > 0) {
+                      const lastBlock = blocks[blocks.length - 1];
+                      if (window.Editor._renderSingleMermaid) {
+                          window.Editor._renderSingleMermaid(lastBlock);
+                      }
+                   }
+                }, 100);
+                if (window.Editor._scheduleAutoSave) window.Editor._scheduleAutoSave();
+             }
+             window.showToast('🤖 Diagram inserted at cursor', 'success');
           } else {
              window.showToast('🤖 No diagram content generated', 'warning');
           }
@@ -1002,7 +1028,28 @@
           rangeObj.selectNodeContents(body);
           document.getSelection().addRange(rangeObj);
           document.execCommand('insertHTML', false, cleanHtml);
-       } else if (action === 'APPEND_BOTTOM' || action === 'INSERT_IMAGE' || action === 'GENERATE_TABLE' || action === 'GENERATE_LIST' || action === 'SUMMARIZE_INLINE' || action === 'INSERT_CODE_BLOCK' || action === 'INSERT_CHECKLIST' || action === 'INSERT_BLOCKQUOTE') {
+       } else if (action === 'INSERT_IMAGE' || action === 'GENERATE_TABLE' || action === 'GENERATE_LIST' || action === 'SUMMARIZE_INLINE' || action === 'INSERT_CODE_BLOCK' || action === 'INSERT_CHECKLIST' || action === 'INSERT_BLOCKQUOTE') {
+          // If the AI generated just a URL for an image, wrap it properly
+          let htmlToInsert = parsedHtml;
+          if (action === 'INSERT_IMAGE' && !parsedHtml.includes('<img')) {
+            const urlMatch = parsedHtml.match(/https?:\/\/[^\s"'<>\)]+/);
+            if (urlMatch) {
+              htmlToInsert = `<img src="${urlMatch[0]}" style="max-width:100%;border-radius:8px;margin:8px 0;"><p>&nbsp;</p>`;
+            }
+          }
+
+          if (window.Editor && window.Editor._restoreSelection) {
+            window.Editor._restoreSelection();
+          } else {
+            // Fallback to end if no selection saved
+            const rangeObj = document.createRange();
+            rangeObj.selectNodeContents(body);
+            rangeObj.collapse(false);
+            document.getSelection().removeAllRanges();
+            document.getSelection().addRange(rangeObj);
+          }
+          document.execCommand('insertHTML', false, htmlToInsert + '<p>&nbsp;</p>');
+       } else if (action === 'APPEND_BOTTOM') {
           const rangeObj = document.createRange();
           rangeObj.selectNodeContents(body);
           rangeObj.collapse(false); // end
@@ -1020,7 +1067,7 @@
           document.execCommand('insertHTML', false, parsedHtml + '<br><br>');
        }
        
-       window.Editor._scheduleAutoSave();
+       if (window.Editor && window.Editor._scheduleAutoSave) window.Editor._scheduleAutoSave();
        window.showToast(`🤖 AI executed ${action}`, 'success');
     },
 
