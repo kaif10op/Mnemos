@@ -72,8 +72,8 @@ router.delete('/image/:filename', auth, async (req, res) => {
     }
     const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
 
-    // Find the file to verify ownership (optional but Pro)
-    const files = await bucket.find({ filename: req.params.filename }).toArray();
+    // ✅ PERFORMANCE: Limit to 1 result since we only need to delete one file
+    const files = await bucket.find({ filename: req.params.filename }).limit(1).toArray();
     if (!files || files.length === 0) {
       return res.status(404).json({ msg: 'Image not found' });
     }
@@ -164,6 +164,16 @@ router.get('/status', auth, async (req, res) => {
 // @route   GET api/sync
 // @desc    Fetch user's notes and folders from cloud (with ETag caching)
 // @access  Private
+/**
+ * Retrieves all non-deleted notes and folders for the authenticated user.
+ * Uses pagination and ETag-based caching to optimize performance.
+ *
+ * @param {Object} req - Express request object
+ * @param {string} req.user.id - User ID from JWT token
+ * @param {number} [req.query.page] - Page number for pagination (default: 1)
+ * @param {number} [req.query.limit] - Items per page (min: 1, max: 100, default: 50)
+ * @returns {Object} { notes: Array, folders: Array, hash: string }
+ */
 router.get('/', auth, async (req, res) => {
   const userId = req.user.id;
   const page = Math.max(1, parseInt(req.query.page) || 1);

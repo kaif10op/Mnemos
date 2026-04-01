@@ -1,5 +1,18 @@
 const mongoose = require('mongoose');
 
+/**
+ * Audit Schema - Track all destructive operations for compliance and debugging
+ *
+ * Fields:
+ * - userId: User who performed the action
+ * - action: Type of action (DELETE_NOTE, RESTORE_NOTE, etc)
+ * - resourceId: The note/folder/share being acted upon (clientId or token)
+ * - resourceType: Type of resource (note, folder, share)
+ * - details: Additional context (what was deleted, restore info, etc)
+ * - ipAddress: User's IP address for security auditing
+ * - userAgent: Browser info for debugging
+ * - createdAt: Auto-deleted after 90 days via TTL index
+ */
 const AuditSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,

@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { logger, requestLogger } = require('./utils/logger');
+const config = require('./config/constants');
 
 // ✅ RELIABILITY: Global error handlers for unhandled rejections (set up FIRST)
 process.on('unhandledRejection', (reason, promise) => {
@@ -60,7 +61,7 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.tailwindcss.com; " +
     "img-src 'self' data: https: blob:; " +
     "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; " +
-    "connect-src 'self' https://firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; " +
+    "connect-src 'self' https://firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com; " +
     "frame-src 'self' https://*.firebaseapp.com; " +
     "object-src 'none'; " +
     "base-uri 'self'; " +
@@ -132,11 +133,23 @@ const connectDB = async () => {
     // 🚀 Disable Mongoose's silent buffering trap. Fail fast in Serverless!
     mongoose.set('bufferCommands', false);
 
-    // Connect with optimized Serverless pooling limits
-    const conn = await mongoose.connect(mongoUri, {
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000
-    });
+    // ✅ PERFORMANCE: Optimize connection pool for serverless
+    // In serverless: smaller pools with shorter timeouts
+    // In traditional: larger pools for connection reuse
+    const isServerless = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+    const mongoOptions = {
+      maxPoolSize: isServerless ? 10 : 50,  // Serverless: low concurrency, Traditional: higher
+      minPoolSize: isServerless ? 0 : 5,
+      maxIdleTimeMS: isServerless ? 60000 : 600000,  // Serverless: 1min, Traditional: 10min
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,  // Socket timeout 45s (before Vercel's 50s limit)
+      retryWrites: true,
+      retryReads: true,
+      family: 4  // Use IPv4 for better compatibility
+    };
+
+    // Connect with optimized pooling limits
+    const conn = await mongoose.connect(mongoUri, mongoOptions);
     
     isConnected = !!conn.connections[0].readyState;
     logger.info('MongoDB Connected');
