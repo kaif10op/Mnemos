@@ -34,7 +34,11 @@
       const folders = window.Store.getAllFolders();
       const allCount = window.Store.getAllNotes().length;
 
-      // Update "All Notes" count with smooth update
+      // Update permanent "All Notes" count
+      const allCountEl = document.getElementById('all-notes-count');
+      if (allCountEl) allCountEl.textContent = allCount;
+
+      // Also update the old nav-item count if it exists
       let allNotesItem = document.querySelector('.nav-item[data-filter="all"]');
       if (allNotesItem) {
         const countEl = allNotesItem.querySelector('.nav-item-count');
@@ -84,6 +88,7 @@
           const item = e.target.closest('.nav-item');
           if (item) {
             container.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            document.getElementById('all-notes-nav')?.classList.remove('active');
             item.classList.add('active');
 
             const filter = item.dataset.filter;
@@ -152,7 +157,21 @@
     },
 
     _bindAllNotes() {
-      // Already handled in renderFolders
+      const allNotesNav = document.getElementById('all-notes-nav');
+      if (allNotesNav) {
+        allNotesNav.addEventListener('click', () => {
+          // Remove active from all folder items
+          document.querySelectorAll('#folders-list .nav-item').forEach(i => i.classList.remove('active'));
+          document.querySelectorAll('.tag-chip').forEach(t => t.classList.remove('active'));
+          allNotesNav.classList.add('active');
+          
+          activeFilter = { type: 'all', id: null };
+          activeTag = null;
+          
+          window.NoteList.render(true);
+          this._closeMobileMenu();
+        });
+      }
     },
 
     _bindNewFolder() {

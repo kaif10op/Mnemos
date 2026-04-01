@@ -6,6 +6,7 @@
   let currentNoteId = null;
   let saveTimer = null;
   let isSaved = true;
+  let _lastEditorRange = null; // Global: saves cursor pos before toolbar steals focus
 
   window.Editor = {
     init() {
@@ -137,36 +138,61 @@
     },
 
     _bindToolbar() {
+      // GLOBAL: Save editor selection before ANY toolbar interaction steals focus
+      const toolbar = document.querySelector('.editor-toolbar');
+      if (toolbar) {
+        toolbar.addEventListener('mousedown', () => {
+          const sel = window.getSelection();
+          const body = document.getElementById('editor-body');
+          if (sel.rangeCount > 0 && body && body.contains(sel.anchorNode)) {
+            _lastEditorRange = sel.getRangeAt(0).cloneRange();
+          }
+        });
+      }
+
       document.querySelectorAll('[data-command]').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
           const cmd = btn.dataset.command;
           const val = btn.dataset.value || null;
 
+          // Restore selection before executing command
+          this._restoreSelection();
+
           if (cmd === 'createLink') {
+            this._saveSelection(); // Save selection before prompt opens
             const url = prompt('Enter URL:');
-            if (url) document.execCommand(cmd, false, url);
+            if (url) {
+              this._restoreSelection(); // Restore it after prompt closes
+              document.execCommand(cmd, false, url);
+            }
           } else {
             document.execCommand(cmd, false, val);
           }
 
           this._updateToolbarState();
           this._scheduleAutoSave();
-          document.getElementById('editor-body').focus();
         });
       });
 
-      // Heading select
+      // Heading select — save selection on mousedown
       const headingSelect = document.getElementById('heading-select');
       if (headingSelect) {
+        headingSelect.addEventListener('mousedown', () => {
+          const sel = window.getSelection();
+          const body = document.getElementById('editor-body');
+          if (sel.rangeCount > 0 && body && body.contains(sel.anchorNode)) {
+            _lastEditorRange = sel.getRangeAt(0).cloneRange();
+          }
+        });
         headingSelect.addEventListener('change', (e) => {
           const val = e.target.value;
           if (val) {
+            this._restoreSelection();
             document.execCommand('formatBlock', false, val);
             this._scheduleAutoSave();
           }
           e.target.value = '';
-          document.getElementById('editor-body').focus();
         });
       }
 
@@ -191,14 +217,47 @@
         });
       }
 
-      // 📊 Table Insertion
+      // 📊 Table Insertion — Visual Grid Picker
       const tableBtn = document.getElementById('insert-table-btn');
       if (tableBtn) {
-        tableBtn.addEventListener('click', () => {
-          const rows = prompt('Number of rows:', '3') || 3;
-          const cols = prompt('Number of columns:', '3') || 3;
-          this._insertTable(parseInt(rows), parseInt(cols));
+        tableBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this._showTableGridPicker(tableBtn);
         });
+      }
+
+      // 📏 Font Size Selector — with selection preservation
+      const fontSizeSelect = document.getElementById('font-size-select');
+      if (fontSizeSelect) {
+        let savedRange = null;
+        fontSizeSelect.addEventListener('mousedown', () => {
+          const sel = window.getSelection();
+          if (sel.rangeCount > 0) savedRange = sel.getRangeAt(0).cloneRange();
+        });
+        fontSizeSelect.addEventListener('change', (e) => {
+          const val = e.target.value;
+          if (val && savedRange) {
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedRange);
+            document.execCommand('fontSize', false, val);
+            this._scheduleAutoSave();
+          }
+          e.target.value = '';
+          document.getElementById('editor-body').focus();
+        });
+      }
+
+      // 🖨️ Print Button
+      const printBtn = document.getElementById('print-btn');
+      if (printBtn) {
+        printBtn.addEventListener('click', () => window.print());
+      }
+
+      // 📄 Paper Theme Picker
+      const paperThemeBtn = document.getElementById('paper-theme-btn');
+      if (paperThemeBtn) {
+        paperThemeBtn.addEventListener('click', () => this._showPaperThemePicker());
       }
 
       // Image upload
@@ -232,6 +291,7 @@
               const baseUrl = window.API_BASE_URL.replace('/api', '');
               const fullUrl = data.url.startsWith('http') ? data.url : `${baseUrl}${data.url}`;
               
+              if (this._restoreSelection) this._restoreSelection();
               document.execCommand('insertImage', false, fullUrl);
               this._scheduleAutoSave();
               window.showToast('🖼️ Optimized upload complete', 'success');
@@ -527,7 +587,12 @@
                     selObj.removeAllRanges();
                     selObj.addRange(rangeObj);
                     
-                    const htmlToInsert = window.AIPanel ? window.AIPanel._parseMarkdown(data.result) : data.result;
+                    const htmlToInsert = data.result
+                      .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                      .replace(/`(.*?)`/g, '<code>$1</code>')
+                      .replace(/\n/g, '<br>');
                     document.execCommand('insertHTML', false, htmlToInsert);
                     
                     this._scheduleAutoSave();
@@ -731,12 +796,15 @@
                       title.textContent = 'ELI5 Explanation';
                       footer.style.display = 'none';
                       // Use AIPanel markdown parser if available
-                      body.innerHTML = window.AIPanel ? window.AIPanel._parseMarkdown(data.result) : data.result;
+                      body.innerHTML = data.result
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                        .replace(/`(.*?)`/g, '<code>$1</code>')
+                        .replace(/\n/g, '<br>');
                       modal.style.display = 'flex';
                     } else if (mode === 'format') {
-                      // format as markdown HTML
-                      const htmlToInsert = window.AIPanel ? window.AIPanel._parseMarkdown(data.result) : data.result;
-                      document.execCommand('insertHTML', false, htmlToInsert);
+                      // Format: AI may return HTML lists/tables — insert directly
+                      document.execCommand('insertHTML', false, data.result);
                       this._scheduleAutoSave();
                       window.showToast('✨ Text formatted', 'success');
                     } else {
@@ -837,9 +905,23 @@
       const commands = [
         { id: 'h1', name: 'Heading 1', desc: 'Big section heading', icon: 'ph-text-h-one' },
         { id: 'h2', name: 'Heading 2', desc: 'Medium section heading', icon: 'ph-text-h-two' },
-        { id: 'callout', name: 'Callout', desc: 'Info box for key notes', icon: 'ph-info' },
-        { id: 'table', name: 'Table', desc: '3x3 Data grid', icon: 'ph-table' },
+        { id: 'h3', name: 'Heading 3', desc: 'Small section heading', icon: 'ph-text-h-three' },
+        { id: 'callout', name: 'Callout — Info', desc: 'Blue information box', icon: 'ph-info' },
+        { id: 'callout-warning', name: 'Callout — Warning', desc: 'Yellow warning box', icon: 'ph-warning' },
+        { id: 'callout-success', name: 'Callout — Success', desc: 'Green success box', icon: 'ph-check-circle' },
+        { id: 'callout-danger', name: 'Callout — Danger', desc: 'Red danger box', icon: 'ph-x-circle' },
+        { id: 'table', name: 'Table', desc: 'Visual grid picker', icon: 'ph-table' },
         { id: 'divider', name: 'Divider', desc: 'Visual separator', icon: 'ph-minus' },
+        { id: 'code', name: 'Code Block', desc: 'Syntax highlighted snippet', icon: 'ph-code' },
+        { id: 'quote', name: 'Blockquote', desc: 'Insert a styled quote', icon: 'ph-quotes' },
+        { id: 'checklist', name: 'Checklist', desc: 'Interactive checkbox list', icon: 'ph-check-square' },
+        { id: 'image', name: 'Image (URL)', desc: 'Insert image from URL', icon: 'ph-image' },
+        { id: 'mermaid', name: 'Mermaid Diagram', desc: 'Live flowchart / diagram', icon: 'ph-graph' },
+        { id: 'columns', name: 'Two Columns', desc: 'Side-by-side layout', icon: 'ph-columns' },
+        { id: 'toc', name: 'Table of Contents', desc: 'Auto-linked headings index', icon: 'ph-list-bullets' },
+        { id: 'date', name: 'Current Date', desc: 'Insert formatted date', icon: 'ph-calendar' },
+        { id: 'emoji', name: 'Emoji Picker', desc: 'Quick emoji insert', icon: 'ph-smiley' },
+        { id: 'math', name: 'Math Block', desc: 'Formatted equation', icon: 'ph-math-operations' },
         { id: 'ai-summarize', name: 'Summarize Note', desc: '✨ Generate AI summary', icon: 'ph-magic-wand' },
         { id: 'ai-actions', name: 'Extract Actions', desc: '✨ Find action items', icon: 'ph-check-square-offset' },
         { id: 'ai-flashcards', name: 'Flashcards', desc: '✨ Create study cards', icon: 'ph-cards' },
@@ -875,7 +957,7 @@
     },
 
     _selectSlashItem() {
-      const commands = ['h1', 'h2', 'callout', 'table', 'divider', 'ai-summarize', 'ai-actions', 'ai-flashcards', 'ai-quiz', 'ai-mindmap'];
+      const commands = ['h1', 'h2', 'h3', 'callout', 'callout-warning', 'callout-success', 'callout-danger', 'table', 'divider', 'code', 'quote', 'checklist', 'image', 'mermaid', 'columns', 'toc', 'date', 'emoji', 'math', 'ai-summarize', 'ai-actions', 'ai-flashcards', 'ai-quiz', 'ai-mindmap'];
       const cmd = commands[this._slashIndex];
       this._hideSlashMenu();
       
@@ -897,19 +979,76 @@
         return;
       }
       
-      if (cmd === 'h1' || cmd === 'h2') {
+      if (cmd === 'h1' || cmd === 'h2' || cmd === 'h3') {
         document.execCommand('formatBlock', false, cmd);
       } else if (cmd === 'divider') {
         document.execCommand('insertHorizontalRule');
       } else if (cmd === 'table') {
-        this._insertTable(3, 3);
-      } else if (cmd === 'callout') {
+        const tableBtn = document.getElementById('insert-table-btn');
+        if (tableBtn) this._showTableGridPicker(tableBtn);
+        else this._insertTable(3, 3);
+      } else if (cmd === 'code') {
+        const html = `<pre class="pro-code-block"><code>// Your code here...</code></pre><p>&nbsp;</p>`;
+        document.execCommand('insertHTML', false, html);
+      } else if (cmd === 'quote') {
+        const html = `<blockquote style="border-left:3px solid var(--accent-primary);padding:8px 16px;margin:12px 0;color:var(--text-secondary);font-style:italic;">Write your quote here...</blockquote><p>&nbsp;</p>`;
+        document.execCommand('insertHTML', false, html);
+      } else if (cmd === 'checklist') {
+        const html = `<ul style="list-style:none;padding-left:4px;"><li><input type="checkbox" style="margin-right:8px;"> Task item 1</li><li><input type="checkbox" style="margin-right:8px;"> Task item 2</li><li><input type="checkbox" style="margin-right:8px;"> Task item 3</li></ul><p>&nbsp;</p>`;
+        document.execCommand('insertHTML', false, html);
+      } else if (cmd === 'image') {
+        this._saveSelection(); // Save selection before prompt steals it
+        const url = prompt('Enter image URL:');
+        if (url) {
+          this._restoreSelection(); // Restore after prompt closes
+          const html = `<img src="${url}" alt="User image" style="max-width:100%;border-radius:8px;margin:8px 0;"><p>&nbsp;</p>`;
+          document.execCommand('insertHTML', false, html);
+        }
+      } else if (cmd === 'callout' || cmd === 'callout-warning' || cmd === 'callout-success' || cmd === 'callout-danger') {
+        const variants = {
+          'callout': { icon: 'ph-info', cls: 'info', text: 'Important information here...' },
+          'callout-warning': { icon: 'ph-warning', cls: 'warning', text: 'Warning: Be careful about...' },
+          'callout-success': { icon: 'ph-check-circle', cls: 'success', text: 'Success! Everything is working...' },
+          'callout-danger': { icon: 'ph-x-circle', cls: 'danger', text: 'Danger: Critical issue...' }
+        };
+        const v = variants[cmd];
         const html = `
-          <div class="pro-callout" contenteditable="false">
-            <div class="pro-callout-icon"><i class="ph-fill ph-info"></i></div>
-            <div class="pro-callout-content" contenteditable="true">Write your important note here...</div>
+          <div class="pro-callout pro-callout-${v.cls}" contenteditable="false">
+            <div class="pro-callout-icon"><i class="ph-fill ${v.icon}"></i></div>
+            <div class="pro-callout-content" contenteditable="true">${v.text}</div>
           </div><p>&nbsp;</p>
         `;
+        document.execCommand('insertHTML', false, html);
+      } else if (cmd === 'mermaid') {
+        const html = `
+          <div class="mermaid-block" contenteditable="false">
+            <div class="mermaid-source" contenteditable="true" spellcheck="false">flowchart TD\n    A[Start] --> B{Decision}\n    B -->|Yes| C[Result 1]\n    B -->|No| D[Result 2]</div>
+            <div class="mermaid-preview"></div>
+            <div class="mermaid-actions">
+              <button class="mermaid-render-btn" onclick="window.Editor._renderSingleMermaid(this.closest('.mermaid-block'))">▶ Render Diagram</button>
+            </div>
+          </div><p>&nbsp;</p>
+        `;
+        document.execCommand('insertHTML', false, html);
+      } else if (cmd === 'columns') {
+        const html = `
+          <div class="pro-columns" contenteditable="false">
+            <div class="pro-column" contenteditable="true">Column 1 content...</div>
+            <div class="pro-column" contenteditable="true">Column 2 content...</div>
+          </div><p>&nbsp;</p>
+        `;
+        document.execCommand('insertHTML', false, html);
+      } else if (cmd === 'toc') {
+        this._insertTableOfContents();
+      } else if (cmd === 'date') {
+        const now = new Date();
+        const formatted = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const html = `<span class="pro-date-chip">📅 ${formatted}</span>&nbsp;`;
+        document.execCommand('insertHTML', false, html);
+      } else if (cmd === 'emoji') {
+        this._showEmojiPicker();
+      } else if (cmd === 'math') {
+        const html = `<div class="pro-math-block" contenteditable="true" spellcheck="false">E = mc²</div><p>&nbsp;</p>`;
         document.execCommand('insertHTML', false, html);
       }
       this._scheduleAutoSave();
@@ -922,6 +1061,27 @@
     },
 
     /* ── Core Editor Helpers ── */
+
+    /** Saves the current cursor/selection from the editor body */
+    _saveSelection() {
+      const sel = window.getSelection();
+      const body = document.getElementById('editor-body');
+      if (sel.rangeCount > 0 && body && body.contains(sel.anchorNode)) {
+        _lastEditorRange = sel.getRangeAt(0).cloneRange();
+      }
+    },
+
+    /** Restores the last saved cursor/selection into the editor body */
+    _restoreSelection() {
+      const body = document.getElementById('editor-body');
+      if (!body) return;
+      body.focus();
+      if (_lastEditorRange) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(_lastEditorRange);
+      }
+    },
 
     _scheduleAutoSave() {
       this._setSaved(false);
@@ -1095,13 +1255,170 @@
       for (let i = 0; i < rows; i++) {
         html += '<tr>';
         for (let j = 0; j < cols; j++) {
-          html += '<td style="border:1px solid var(--border-default); padding:10px;">&nbsp;</td>';
+          if (i === 0) {
+            html += '<th style="border:1px solid var(--border-default); padding:12px; background:linear-gradient(135deg, #6366f1, #8b5cf6); color:#fff; font-weight:600;">Header</th>';
+          } else {
+            html += '<td style="border:1px solid var(--border-default); padding:12px;">&nbsp;</td>';
+          }
         }
         html += '</tr>';
       }
       html += '</table><p>&nbsp;</p>';
-      document.getElementById('editor-body').focus();
+      this._restoreSelection();
       document.execCommand('insertHTML', false, html);
+    },
+
+    /* ── Visual Table Grid Picker ── */
+    _showTableGridPicker(anchorEl) {
+      this._saveSelection(); // Preserve cursor before picker steals focus
+      const picker = document.getElementById('table-grid-picker');
+      const cellsContainer = document.getElementById('table-grid-cells');
+      if (!picker || !cellsContainer) return;
+
+      // Build 8x8 grid
+      cellsContainer.innerHTML = '';
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'table-grid-cell';
+          cell.dataset.row = r + 1;
+          cell.dataset.col = c + 1;
+          cell.addEventListener('mouseover', () => {
+            this._highlightGridCells(r + 1, c + 1);
+            document.getElementById('table-grid-label').textContent = `${r + 1} × ${c + 1}`;
+          });
+          cell.addEventListener('click', () => {
+            picker.style.display = 'none';
+            this._insertTable(r + 1, c + 1);
+          });
+          cellsContainer.appendChild(cell);
+        }
+      }
+
+      // Position near button
+      const rect = anchorEl.getBoundingClientRect();
+      picker.style.display = 'block';
+      picker.style.left = `${rect.left}px`;
+      picker.style.top = `${rect.bottom + 8}px`;
+
+      // Hide on click outside
+      const hideHandler = (e) => {
+        if (!picker.contains(e.target) && e.target !== anchorEl) {
+          picker.style.display = 'none';
+          document.removeEventListener('mousedown', hideHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener('mousedown', hideHandler), 50);
+    },
+
+    _highlightGridCells(rows, cols) {
+      document.querySelectorAll('.table-grid-cell').forEach(cell => {
+        const r = parseInt(cell.dataset.row);
+        const c = parseInt(cell.dataset.col);
+        cell.classList.toggle('active', r <= rows && c <= cols);
+      });
+    },
+
+    /* ── Mermaid Live Rendering Engine ── */
+    async _renderSingleMermaid(block) {
+      if (!block || !window.mermaid) return;
+      const source = block.querySelector('.mermaid-source');
+      const preview = block.querySelector('.mermaid-preview');
+      if (!source || !preview) return;
+
+      const code = source.textContent.replace(/\\n/g, '\n').trim();
+      if (!code) return;
+
+      try {
+        const id = 'mermaid-' + Date.now();
+        const { svg } = await mermaid.render(id, code);
+        preview.innerHTML = svg;
+        preview.style.display = 'block';
+        source.style.display = 'none';
+        block.querySelector('.mermaid-actions').style.display = 'none';
+
+        // Click preview to re-edit
+        preview.onclick = () => {
+          preview.style.display = 'none';
+          source.style.display = 'block';
+          block.querySelector('.mermaid-actions').style.display = 'flex';
+          source.focus();
+        };
+      } catch (err) {
+        preview.innerHTML = `<div style="color:#ef4444; padding:8px; font-size:13px;">⚠️ Mermaid Syntax Error: ${err.message || 'Invalid diagram'}</div>`;
+        preview.style.display = 'block';
+      }
+    },
+
+    _renderAllMermaidBlocks() {
+      const blocks = document.querySelectorAll('.mermaid-block');
+      blocks.forEach(block => {
+        const preview = block.querySelector('.mermaid-preview');
+        if (preview && preview.style.display !== 'block') {
+          this._renderSingleMermaid(block);
+        }
+      });
+    },
+
+    /* ── Table of Contents Generator ── */
+    _insertTableOfContents() {
+      const body = document.getElementById('editor-body');
+      if (!body) return;
+      const headings = body.querySelectorAll('h1, h2, h3');
+      if (headings.length === 0) {
+        window.showToast('No headings found in this note', 'warning');
+        return;
+      }
+      let tocHtml = '<div class="pro-toc"><div class="pro-toc-title">📑 Table of Contents</div><ul>';
+      headings.forEach((h, i) => {
+        const level = h.tagName.toLowerCase();
+        const indent = level === 'h1' ? 0 : level === 'h2' ? 16 : 32;
+        const id = `heading-${i}`;
+        h.id = id;
+        tocHtml += `<li style="padding-left:${indent}px"><a href="#${id}" style="color:var(--accent-primary);text-decoration:none;">${h.textContent}</a></li>`;
+      });
+      tocHtml += '</ul></div><p>&nbsp;</p>';
+      document.execCommand('insertHTML', false, tocHtml);
+    },
+
+    /* ── Emoji Picker ── */
+    _showEmojiPicker() {
+      const emojis = ['😀','😂','❤️','🔥','⭐','✅','🎯','🚀','💡','📌','📊','🎨','📝','🔑','💎','🌟','⚡','🏆','📚','🧠','💪','🎉','👍','🙌','❓','⚠️','✨','🔔','📁','🗂️'];
+      const html = `<div class="pro-emoji-grid" contenteditable="false">${emojis.map(e => `<span class="pro-emoji-item" onclick="document.execCommand('insertText', false, '${e}'); this.closest('.pro-emoji-grid').remove();">${e}</span>`).join('')}</div>`;
+      document.execCommand('insertHTML', false, html);
+    },
+
+    /* ── Paper Theme Picker ── */
+    _showPaperThemePicker() {
+      if (!currentNoteId) return;
+      const themes = [
+        { id: 'default', name: 'Clean', desc: 'No background pattern' },
+        { id: 'dotted', name: 'Dotted', desc: 'Subtle dot grid' },
+        { id: 'lined', name: 'Lined', desc: 'Ruled notebook lines' },
+        { id: 'grid', name: 'Grid', desc: 'Engineering grid' },
+        { id: 'texture', name: 'Parchment', desc: 'Textured paper feel' }
+      ];
+      const html = `
+        <div style="padding: 20px;">
+          <h3 style="margin-bottom: 16px;">📄 Paper Style</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            ${themes.map(t => `<button class="btn btn-secondary paper-option" data-paper="${t.id}" style="text-align:left; padding:12px;"><strong>${t.name}</strong><br><small style="color:var(--text-tertiary);">${t.desc}</small></button>`).join('')}
+          </div>
+        </div>
+      `;
+      window.showModal(html);
+      document.querySelectorAll('.paper-option').forEach(btn => {
+        btn.onclick = () => {
+          const paper = btn.dataset.paper;
+          const bodyWrapper = document.getElementById('editor-body-wrapper');
+          if (bodyWrapper) {
+            bodyWrapper.className = 'editor-body-wrapper';
+            if (paper !== 'default') bodyWrapper.classList.add(`paper-${paper}`);
+          }
+          window.closeModal();
+          window.showToast(`📄 Paper style: ${btn.querySelector('strong').textContent}`, 'success');
+        };
+      });
     },
 
     /* ── Image Manipulation Engine ── */
@@ -1264,12 +1581,12 @@
       // 1. Drag Handle Positioning (Hover)
       body.addEventListener('mousemove', (e) => {
         if (this._resizingBlock) return;
-        const block = e.target.closest('img, table, hr, blockquote, p, h1, h2, h3');
+        const block = e.target.closest('img, table, hr, blockquote, p, h1, h2, h3, .mermaid-block, .pro-columns, .pro-toc, pre, ul, ol, .pro-callout, .pro-math-block');
         if (block && block.parentElement === body) {
           const rect = block.getBoundingClientRect();
           dragHandle.style.display = 'flex';
           dragHandle.style.top = `${rect.top + window.scrollY}px`;
-          dragHandle.style.left = `${rect.left - 36}px`; /* Positioned in the 56px gutter */
+          dragHandle.style.left = `${rect.left - 30}px`; /* Positioned in the 48px gutter */
           dragHandle._targetBlock = block;
           
           // Show a subtle hover state on the target block

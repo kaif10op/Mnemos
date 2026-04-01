@@ -16,7 +16,11 @@
     open() {
       if (isAiOpen) return;
       isAiOpen = true;
+      if (window.Editor && window.Editor._saveSelection) {
+        window.Editor._saveSelection(); // Capture cursor position before AI panel steals focus
+      }
       document.getElementById('ai-panel')?.classList.add('open');
+      document.body.classList.add('ai-panel-active');
       const input = document.getElementById('ai-input');
       if (input) {
         setTimeout(() => input.focus(), 300);
@@ -27,6 +31,7 @@
       if (!isAiOpen) return;
       isAiOpen = false;
       document.getElementById('ai-panel')?.classList.remove('open');
+      document.body.classList.remove('ai-panel-active');
       document.getElementById('editor-view')?.focus();
     },
 
@@ -46,6 +51,7 @@
               <select id="ai-context-select" style="background:var(--bg-tertiary); border:1px solid var(--border-default); border-radius:4px; color:var(--text-secondary); font-size:11px; padding:2px 4px; outline:none;">
                 <option value="note">Note Context</option>
                 <option value="folder">Folder Context</option>
+                <option value="workspace">Workspace</option>
               </select>
               <button class="ai-panel-close" id="ai-panel-close" title="Close Panel">
                 <i class="ph-bold ph-x" style="font-size:16px;"></i>
@@ -183,6 +189,75 @@
           document.getElementById('ai-modal-overlay').style.display = 'none';
         });
       }
+
+      // ── Global AI FAB Button ──
+      const globalFab = document.getElementById('global-ai-fab');
+      if (globalFab) {
+        globalFab.addEventListener('click', () => {
+          this.open();
+          const aiInput = document.getElementById('ai-input');
+          if (aiInput) setTimeout(() => aiInput.focus(), 300);
+        });
+      }
+
+      // ── Global Voice Button ──
+      const globalVoiceBtn = document.getElementById('global-voice-btn');
+      if (globalVoiceBtn) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+          const globalRecognition = new SpeechRecognition();
+          globalRecognition.continuous = false;
+          globalRecognition.interimResults = false;
+          
+          globalRecognition.onstart = () => {
+            globalVoiceBtn.classList.add('recording');
+            globalVoiceBtn.innerHTML = '<i class="ph-fill ph-stop"></i>';
+            window.showToast('🎤 Listening...', 'info');
+          };
+          
+          globalRecognition.onresult = (e) => {
+            const text = e.results[0][0].transcript;
+            // Open the panel and submit directly
+            this.open();
+            useVoiceOutput = true;
+            setTimeout(() => this._handleChatSubmit(text), 400);
+          };
+          
+          globalRecognition.onerror = (e) => {
+            console.error('Voice error:', e);
+            globalVoiceBtn.classList.remove('recording');
+            globalVoiceBtn.innerHTML = '<i class="ph-fill ph-microphone"></i>';
+          };
+          
+          globalRecognition.onend = () => {
+            globalVoiceBtn.classList.remove('recording');
+            globalVoiceBtn.innerHTML = '<i class="ph-fill ph-microphone"></i>';
+          };
+          
+          globalVoiceBtn.addEventListener('click', () => {
+            try { globalRecognition.start(); } catch(err) {}
+          });
+        } else {
+          globalVoiceBtn.style.display = 'none';
+        }
+      }
+
+      // ── Global Keyboard Shortcuts ──
+      document.addEventListener('keydown', (e) => {
+        // Ctrl+Space → Open AI panel
+        if (e.code === 'Space' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+          e.preventDefault();
+          this.open();
+          const aiInput = document.getElementById('ai-input');
+          if (aiInput) setTimeout(() => aiInput.focus(), 300);
+        }
+        // Ctrl+Shift+Space → Start voice recording directly
+        if (e.code === 'Space' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+          e.preventDefault();
+          const gvBtn = document.getElementById('global-voice-btn');
+          if (gvBtn) gvBtn.click();
+        }
+      });
     },
 
     async _handleChatSubmit(query) {
@@ -190,37 +265,70 @@
       const loadingId = this._appendLoading();
       isWaiting = true;
 
-      // Collect Context
+      // Collect Context — auto-detect best mode
       let context = '';
-      const contextMode = document.getElementById('ai-context-select')?.value || 'note';
+      let contextMode = document.getElementById('ai-context-select')?.value || 'workspace';
+      const currentId = window.Editor ? window.Editor.getCurrentId() : null;
       
       if (contextMode === 'note') {
-        const editorHtml = document.getElementById('editor-body')?.innerHTML || '';
-        const currentId = window.Editor ? window.Editor.getCurrentId() : null;
-        let metadataStr = '';
-        if (currentId) {
-           const note = window.Store.getNote(currentId);
-           if (note) {
-              metadataStr = `[METADATA: Title="${note.title}", Tags="${(note.tags||[]).join(', ')}", Pinned=${note.pinned ? 'true' : 'false'}]\n\n`;
-           }
-        }
-        context = metadataStr + editorHtml;
+         if (currentId) {
+            const editorHtml = document.getElementById('editor-body')?.innerHTML || '';
+            const note = window.Store.getNote(currentId);
+            let metadataStr = '';
+            if (note) {
+               metadataStr = `[METADATA: Title="${note.title}", Tags="${(note.tags||[]).join(', ')}", Pinned=${note.pinned ? 'true' : 'false'}]\n\n`;
+            }
+            context = metadataStr + editorHtml;
+         } else {
+            context = "[SYSTEM NOTIFICATION: The user is in 'Note Mode' but NO Note is currently actively open in the Editor. Please kindly tell the user to click on a note first if they want you to read or analyze a specific note.]";
+         }
       } else if (contextMode === 'folder') {
-        const currentId = window.Editor ? window.Editor.getCurrentId() : null;
-        const note = currentId ? window.Store.getNote(currentId) : null;
-        
-        if (note && note.folderId) {
-           const folderNotes = window.Store.getAllNotes().filter(n => n.folderId === note.folderId);
-           context = folderNotes.map(n => `[Note: ${n.title} | Tags: ${(n.tags||[]).join(', ')}]\n${n.content || ''}`).join('\n\n---\n\n');
-        } else {
-           const allNotes = window.Store.getAllNotes();
-           context = allNotes.map(n => `[Note: ${n.title} | Tags: ${(n.tags||[]).join(', ')}]\n${n.content || ''}`).join('\n\n---\n\n');
-        }
+         const activeFilter = window.Sidebar ? window.Sidebar.getFilter() : { type: 'all' };
+         let targetFolderId = null;
+         let folderName = 'Current Workspace Context';
+         
+         if (activeFilter && activeFilter.type === 'folder' && activeFilter.id) {
+             targetFolderId = activeFilter.id;
+             const fObj = window.Store.getFolder(targetFolderId);
+             if (fObj) folderName = fObj.name;
+         } else if (currentId) {
+             const note = window.Store.getNote(currentId);
+             if (note && note.folderId) {
+                 targetFolderId = note.folderId;
+                 const fObj = window.Store.getFolder(targetFolderId);
+                 if (fObj) folderName = fObj.name;
+             }
+         }
+         
+         if (targetFolderId) {
+            const folderNotes = window.Store.getAllNotes().filter(n => n.folderId === targetFolderId);
+            const notesStr = folderNotes.map(n => `[Note: ${n.title} | Tags: ${(n.tags||[]).join(', ')}]\n${n.content || ''}`).join('\n\n---\n\n');
+            context = `[FOLDER CONTEXT: "${folderName}"]\nThere are ${folderNotes.length} notes in this folder.\n\n${notesStr}`;
+         } else {
+            const allNotes = window.Store.getAllNotes();
+            const notesStr = allNotes.map(n => `[Note: ${n.title} | Tags: ${(n.tags||[]).join(', ')}]\n${n.content || ''}`).join('\n\n---\n\n');
+            context = `[ALL NOTES CONTEXT]\nThere are ${allNotes.length} notes total.\n\n${notesStr}`;
+         }
+      } else if (contextMode === 'workspace') {
+         // Workspace mode: provide a compact summary of all notes + folders
+         const allFolders = window.Store.getAllFolders();
+         const allNotes = window.Store.getAllNotes();
+         const folderSummary = allFolders.map(f => `Folder: ${f.name} (${allNotes.filter(n => n.folderId === f.id).length} notes)`).join('\n');
+         const noteSummary = allNotes.slice(0, 30).map(n => {
+            const plainText = window.Store.stripHtml(n.content || '').substring(0, 50).replace(/\n/g, ' ');
+            return `- "${n.title || 'Untitled'}" [tags: ${(n.tags||[]).join(',')}] (snippet: "${plainText}...")`;
+         }).join('\n');
+         context = `[WORKSPACE SUMMARY]\n${allFolders.length} folders, ${allNotes.length} notes total\n\nFolders:\n${folderSummary || 'No folders'}\n\nNotes:\n${noteSummary || 'No notes'}`;
       }
 
       try {
         const token = window.Auth.getToken();
-        const endpoint = contextMode === 'note' ? '/ai/agent' : '/ai/complete';
+        // Always use the agent endpoint for maximum capability
+        const endpoint = '/ai/agent';
+        
+        // 60 second timeout to prevent infinite hang
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
         
         const res = await fetch(`${window.API_BASE_URL}${endpoint}`, {
           method: 'POST',
@@ -228,28 +336,74 @@
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ prompt: query, context: context.substring(0, 15000) })
+          body: JSON.stringify({ prompt: query, context: context.substring(0, 15000) }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
 
         if (!res.ok) throw new Error('AI failed to respond');
         const data = await res.json();
         
-        if (contextMode === 'note' && data.agent) {
-           const payload = data.agent;
-           if (payload.action === 'CHAT') {
-               this._replaceLoadingWithMessage(loadingId, payload.text || 'No response.');
-               if (useVoiceOutput) this._speak(payload.text);
+        if (data.agent && data.agent.actions) {
+           const actions = data.agent.actions;
+           
+           // Separate CHAT actions from execution actions
+           const chatActions = actions.filter(a => a.action === 'CHAT');
+           const execActions = actions.filter(a => a.action !== 'CHAT');
+           
+           if (execActions.length === 0 && chatActions.length > 0) {
+              // Pure conversation
+              const chatText = chatActions.map(a => a.text).join('\n\n');
+              this._replaceLoadingWithMessage(loadingId, chatText || 'No response.');
+              if (useVoiceOutput) this._speak(chatText);
            } else {
-               this._executeAgentAction(payload);
-               this._replaceLoadingWithMessage(loadingId, `✨ Automated Task: **${payload.action}**\n\nI have successfully updated your workspace!`);
-               if (useVoiceOutput) this._speak(`Alright, I've successfully completed the ${payload.action.replace(/_/g, ' ')} task for you.`);
+              // Execute all actions sequentially with stagger
+              const totalOps = execActions.length;
+              let completed = 0;
+              
+              execActions.forEach((actionPayload, i) => {
+                 setTimeout(() => {
+                    try {
+                       this._executeAgentAction(actionPayload);
+                       completed++;
+                    } catch(e) {
+                       console.warn(`[Agent] Action ${i} (${actionPayload.action}) failed:`, e);
+                    }
+                    
+                    // After all completed — refresh UI and report
+                    if (completed >= totalOps) {
+                       window.NoteList.render(true);
+                       if (window.Sidebar) {
+                          window.Sidebar.renderFolders();
+                          window.Sidebar.renderTags();
+                       }
+                    }
+                 }, i * 250); // 250ms stagger between operations
+              });
+              
+              // Build summary
+              const actionNames = execActions.map(a => a.action.replace(/_/g, ' ')).join(', ');
+              const summaryMsg = totalOps === 1
+                 ? `✨ **${execActions[0].action}** completed!`
+                 : `✨ **${totalOps} actions** executed: ${actionNames}`;
+              
+              // Include any CHAT text too
+              const chatText = chatActions.map(a => a.text).join('\n\n');
+              this._replaceLoadingWithMessage(loadingId, chatText ? `${summaryMsg}\n\n${chatText}` : summaryMsg);
+              if (useVoiceOutput) this._speak(`Done! I completed ${totalOps} task${totalOps > 1 ? 's' : ''}.`);
            }
-        } else {
+        } else if (data.result) {
            this._replaceLoadingWithMessage(loadingId, data.result || 'No response generated.');
            if (useVoiceOutput) this._speak(data.result);
+        } else {
+           this._replaceLoadingWithMessage(loadingId, '⚠️ No actionable response from AI.');
         }
       } catch (err) {
-        this._replaceLoadingWithMessage(loadingId, `⚠️ Error: ${err.message}`);
+        const errorMsg = err.name === 'AbortError' 
+          ? '⚠️ Request timed out (60s). Try a simpler prompt or check your LLM API keys.'
+          : `⚠️ Error: ${err.message}`;
+        this._replaceLoadingWithMessage(loadingId, errorMsg);
       } finally {
         isWaiting = false;
       }
@@ -258,59 +412,135 @@
     _executeAgentAction(payload) {
        const { action, text, title, tags } = payload;
 
-       // Handle System actions first
-       if (action === 'CREATE_NOTE') {
-          const folderId = window.Sidebar && window.Sidebar.currentFolderId ? window.Sidebar.currentFolderId : null;
-          const target_title = title || '✨ AI Generated Note';
-          const strippedText = text ? text : ''; // don't format on create, openNote does it basically? Actually createNote takes markdown or text. Wait, Editor expects HTML usually
-          const newNote = window.Store.createNote(folderId, target_title, strippedText);
-          if (newNote && window.Editor) {
-             window.Editor.openNote(newNote.id);
-             window.NoteList.render();
-             window.showToast('🤖 AI created a new note', 'success');
+       // Handle System actions
+       if (action === 'AUTO_CREATE_NOTE' || action === 'CREATE_NOTE' || action === 'CREATE_RICH_NOTE') {
+          let folderId = window.Sidebar && window.Sidebar.currentFolderId ? window.Sidebar.currentFolderId : null;
+          
+          // If AI specified a folder name, find or create it
+          const folderName = payload.folderName;
+          if (folderName) {
+             const allFolders = window.Store.getAllFolders();
+             const existing = allFolders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
+             if (existing) {
+                folderId = existing.id;
+             } else {
+                const newFolder = window.Store.createFolder(folderName);
+                folderId = newFolder.id;
+                window.Sidebar.renderFolders();
+             }
+          }
+          
+          const target_title = title || '✨ AI Generating...';
+          const instructions = payload.instructions || text || 'Write a detailed HTML document for this note.';
+          const newNote = window.Store.createNote(folderId);
+          
+          if (newNote) {
+             // Create skeleton note immediately
+             window.Store.updateNote(newNote.id, { 
+                 title: target_title, 
+                 content: '<div style="text-align:center;padding:40px;color:#888;">🤖 AI is writing this note in the background...</div>' 
+             });
+             
+             if (window.Editor) {
+                window.Editor.open(newNote.id);
+                window.NoteList.render();
+                window.showToast('🚀 AI worker dispatched to write note...', 'info', 3000);
+             }
+             
+             // Spawn sub-agent writer
+             fetch(`${window.API_BASE_URL}/ai/agent`, {
+                 method: 'POST',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     'Authorization': `Bearer ${window.Auth.getToken()}`
+                 },
+                 body: JSON.stringify({
+                     prompt: `CREATION TASK: ${instructions}.\n\nOutput your response ONLY as an array containing a single {"action": "FIND_AND_UPDATE"} object outputting the generated rich HTML content.\n\nCRITICAL DESIGN RULE: NEVER wrap the entire document in global background colors or top-level text colors. Background colors ONLY belong on code blocks or specific highlights. Do NOT add <style> blocks.`,
+                     context: `[METADATA: Title="${target_title}"]\n\n(Drafting new content...)`
+                 })
+             }).then(res => res.json()).then(data => {
+                 if (data.agent && data.agent.actions && data.agent.actions.length > 0) {
+                     const updateAction = data.agent.actions.find(a => a.action === 'FIND_AND_UPDATE' || a.action === 'REPLACE_ALL');
+                     if (updateAction && updateAction.text) {
+                         const cleanHtml = this._sanitizeAgentHtml(updateAction.text);
+                         window.Store.updateNote(newNote.id, { content: cleanHtml, title: updateAction.title || target_title });
+                         
+                         // Refresh live if editor is open
+                         const currentOpenId = window.Editor ? window.Editor.getCurrentId() : null;
+                         if (currentOpenId === newNote.id) {
+                            const editorBody = document.getElementById('editor-body');
+                            if (editorBody) editorBody.innerHTML = cleanHtml;
+                            window.Editor._scheduleAutoSave();
+                         }
+                         window.NoteList.render();
+                         window.showToast(`✅ Finished writing "${target_title}"!`, 'success');
+                     } else {
+                         window.showToast(`⚠️ AI couldn't generate content for "${target_title}"`, 'warning');
+                     }
+                 }
+             }).catch(err => {
+                 console.error('Creation Sub-Agent Error:', err);
+                 window.showToast(`🧨 Failed to write background note "${target_title}"`, 'error');
+             });
           }
           return;
        }
        
        if (!window.Editor) return;
        const currentId = window.Editor.getCurrentId();
+       let targetId = currentId;
        
-       if (action === 'UPDATE_TITLE' && currentId) {
+       if (payload.searchQuery && !['AUTO_CREATE_NOTE', 'CREATE_NOTE', 'CREATE_RICH_NOTE'].includes(action)) {
+           const query = payload.searchQuery.toLowerCase();
+           const allNotes = window.Store.getAllNotes();
+           const match = allNotes.find(n => (n.title || '').toLowerCase().includes(query))
+              || allNotes.find(n => window.Store.stripHtml(n.content || '').toLowerCase().includes(query));
+           if (match) targetId = match.id;
+       }
+       const isActiveEditor = targetId === currentId;
+       
+       if (action === 'UPDATE_TITLE' && targetId) {
           if (title) {
-             window.Store.updateNote(currentId, { title });
-             document.getElementById('note-title-display').textContent = title;
+             window.Store.updateNote(targetId, { title });
+             if (isActiveEditor) {
+                 document.getElementById('note-title-display').textContent = title;
+             }
              window.NoteList.render();
              window.showToast('🤖 AI renamed note', 'success');
           }
           return;
        }
        
-       if (action === 'ADD_TAG' && currentId) {
+       if (action === 'ADD_TAG' && targetId) {
           if (tags) {
-             const note = window.Store.getNote(currentId);
+             const note = window.Store.getNote(targetId);
              const tagArray = tags.split(',').map(t => t.trim().replace(/^#/, ''));
              const currentTags = note.tags || [];
              const merged = [...new Set([...currentTags, ...tagArray])];
-             window.Store.updateNote(currentId, { tags: merged });
-             if (window.Editor._renderTags) window.Editor._renderTags(merged);
+             window.Store.updateNote(targetId, { tags: merged });
+             if (isActiveEditor && window.Editor._renderTags) window.Editor._renderTags(merged);
              window.Sidebar.renderTags();
              window.showToast('🤖 AI added tags', 'success');
           }
           return;
        }
 
-       if (action === 'DELETE_NOTE' && currentId) {
-          window.Store.deleteNote(currentId);
-          window.Editor.close();
-          window.NoteList.render();
-          window.Sidebar.renderFolders();
-          window.showToast('🤖 AI deleted note', 'danger');
+       if (action === 'DELETE_NOTE' && targetId) {
+          if (window.showConfirm) {
+             window.showConfirm('🤖 AI wants to delete this note', 'This action cannot be undone. The AI agent requested deletion.', () => {
+                window.Store.deleteNote(targetId);
+                if (isActiveEditor) window.Editor.close();
+                window.NoteList.render();
+                window.Sidebar.renderFolders();
+                window.showToast('🤖 AI deleted note', 'danger');
+             });
+          }
           return;
        }
 
-       if (action === 'PIN_NOTE' && currentId) {
-          const note = window.Store.togglePin(currentId);
-          if (window.Editor._updatePinButton) window.Editor._updatePinButton(note.pinned);
+       if (action === 'PIN_NOTE' && targetId) {
+          const note = window.Store.togglePin(targetId);
+          if (isActiveEditor && window.Editor._updatePinButton) window.Editor._updatePinButton(note.pinned);
           window.NoteList.render();
           window.showToast(note.pinned ? '🤖 AI pinned note' : '🤖 AI unpinned note', 'info');
           return;
@@ -329,7 +559,373 @@
           return;
        }
 
-       // Text manipulating actions
+       // ── Workspace Organization Tools ──
+       if (action === 'CREATE_FOLDER') {
+          const folderName = title || payload.folderName || 'New Folder';
+          const folder = window.Store.createFolder(folderName);
+          if (folder) {
+             window.Sidebar.renderFolders();
+             window.showToast(`🤖 AI created folder: ${folderName}`, 'success');
+
+             // If this was part of CREATE_NOTE with a folder, also handle that
+             if (text) {
+                const newNote = window.Store.createNote(folder.id);
+                if (newNote) {
+                   window.Store.updateNote(newNote.id, { title: title || '✨ AI Note', content: text });
+                   window.Editor.open(newNote.id);
+                   window.NoteList.render();
+                }
+             }
+          }
+          return;
+       }
+
+       if (action === 'MOVE_NOTE' && targetId) {
+          const folderName = payload.folderName || title || '';
+          if (folderName) {
+             const allFolders = window.Store.getAllFolders();
+             const targetFolder = allFolders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
+             if (targetFolder) {
+                window.Store.updateNote(targetId, { folderId: targetFolder.id });
+                window.NoteList.render();
+                window.Sidebar.renderFolders();
+                window.showToast(`🤖 Note moved to "${targetFolder.name}"`, 'success');
+             } else {
+                // Folder doesn't exist — create it first
+                const newFolder = window.Store.createFolder(folderName);
+                window.Store.updateNote(targetId, { folderId: newFolder.id });
+                window.NoteList.render();
+                window.Sidebar.renderFolders();
+                window.showToast(`🤖 Created "${folderName}" and moved note`, 'success');
+             }
+          } else {
+             window.showToast('🤖 No folder name specified', 'warning');
+          }
+          return;
+       }
+
+       if (action === 'DUPLICATE_NOTE' && targetId) {
+          const srcNote = window.Store.getNote(targetId);
+          if (srcNote) {
+             const newNote = window.Store.createNote(srcNote.folderId);
+             if (newNote) {
+                window.Store.updateNote(newNote.id, {
+                   title: (srcNote.title || 'Untitled') + ' (Copy)',
+                   content: srcNote.content || '',
+                   tags: [...(srcNote.tags || [])],
+                   pinned: false
+                });
+                window.Editor.open(newNote.id);
+                window.NoteList.render();
+                window.showToast('🤖 Note duplicated', 'success');
+             }
+          }
+          return;
+       }
+
+       if (action === 'REMOVE_TAG' && targetId) {
+          const tagToRemove = (tags || '').trim().toLowerCase().replace(/^#/, '');
+          if (tagToRemove) {
+             const note = window.Store.getNote(targetId);
+             const newTags = (note.tags || []).filter(t => t.toLowerCase() !== tagToRemove);
+             window.Store.updateNote(targetId, { tags: newTags });
+             if (isActiveEditor && window.Editor._renderTags) window.Editor._renderTags(newTags);
+             window.Sidebar.renderTags();
+             window.showToast(`🤖 Removed tag: ${tagToRemove}`, 'success');
+          }
+          return;
+       }
+
+       // ── AI-Powered Tools ──
+       if (action === 'CREATE_FLASHCARDS') {
+          // Trigger the existing flashcard flow via the quick action handler
+          if (window.AIPanel) {
+             window.AIPanel._handleQuickAction('flashcards');
+          }
+          return;
+       }
+
+       if (action === 'EXPORT_PDF') {
+          if (!isActiveEditor && targetId) window.Editor.open(targetId);
+          // Use browser print dialog for PDF export
+          const editorBody = document.getElementById('editor-body');
+          const titleEl = document.getElementById('editor-title');
+          if (editorBody) {
+             const printWindow = window.open('', '_blank');
+             printWindow.document.write(`
+                <!DOCTYPE html><html><head><title>${titleEl?.value || 'Mnemos Note'}</title>
+                <style>
+                   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.6; }
+                   h1 { font-size: 24px; border-bottom: 2px solid #6366f1; padding-bottom: 8px; }
+                   table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+                   td, th { border: 1px solid #ddd; padding: 8px 12px; }
+                   th { background: #f5f5f5; }
+                   pre { background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto; }
+                   code { font-family: 'Fira Code', monospace; font-size: 13px; }
+                   blockquote { border-left: 3px solid #6366f1; padding: 8px 16px; margin: 12px 0; color: #666; font-style: italic; }
+                   img { max-width: 100%; }
+                   @media print { body { margin: 0; } }
+                </style></head><body>
+                <h1>${titleEl?.value || 'Untitled'}</h1>
+                ${editorBody.innerHTML}
+                </body></html>
+             `);
+             printWindow.document.close();
+             printWindow.focus();
+             setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+             window.showToast('🤖 PDF export opened', 'success');
+          }
+          return;
+       }
+
+       if (action === 'INSERT_MERMAID') {
+          const mermaidCode = text || '';
+          if (mermaidCode) {
+             const safeCode = mermaidCode.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+             const html = `
+               <div class="mermaid-block" contenteditable="false">
+                 <div class="mermaid-source" contenteditable="true" spellcheck="false">${safeCode}</div>
+                 <div class="mermaid-preview" style="display:none;"></div>
+                 <div class="mermaid-actions" style="display:flex;">
+                   <button class="mermaid-render-btn" onclick="window.Editor._renderSingleMermaid(this.closest('.mermaid-block'))">▶ Render Diagram</button>
+                 </div>
+               </div><p>&nbsp;</p>
+             `;
+             
+             if (window.Editor) {
+                if (window.Editor._restoreSelection) window.Editor._restoreSelection();
+                document.execCommand('insertHTML', false, html);
+                setTimeout(() => {
+                   const blocks = document.querySelectorAll('.mermaid-block');
+                   if (blocks.length > 0) {
+                      const lastBlock = blocks[blocks.length - 1];
+                      if (window.Editor._renderSingleMermaid) {
+                          window.Editor._renderSingleMermaid(lastBlock);
+                      }
+                   }
+                }, 100);
+                if (window.Editor._scheduleAutoSave) window.Editor._scheduleAutoSave();
+             }
+             window.showToast('🤖 Diagram inserted at cursor', 'success');
+          } else {
+             window.showToast('🤖 No diagram content generated', 'warning');
+          }
+          return;
+       }
+
+       // ── Workspace Search & Navigation Tools ──
+       if (action === 'SEARCH_NOTES') {
+          const query = payload.searchQuery || text || '';
+          if (query) {
+             // Set the search input and trigger re-render
+             const searchInput = document.getElementById('search-input');
+             if (searchInput) {
+                searchInput.value = query;
+                window.SearchManager.query = query;
+                window.NoteList.render(true);
+                window.showToast(`🤖 Searching for: "${query}"`, 'success');
+             }
+          } else {
+             window.showToast('🤖 No search query specified', 'warning');
+          }
+          return;
+       }
+
+       if (action === 'OPEN_NOTE') {
+          const query = (payload.searchQuery || text || '').toLowerCase();
+          if (query) {
+             const allNotes = window.Store.getAllNotes();
+             // Find best match by title, then by content
+             const match = allNotes.find(n => (n.title || '').toLowerCase().includes(query))
+                || allNotes.find(n => window.Store.stripHtml(n.content || '').toLowerCase().includes(query));
+             if (match) {
+                window.Editor.open(match.id);
+                window.NoteList.render();
+                window.showToast(`🤖 Opened: "${match.title || 'Untitled'}"`, 'success');
+             } else {
+                window.showToast(`🤖 No note found matching "${query}"`, 'warning');
+             }
+          }
+          return;
+       }
+
+       if (action === 'LIST_NOTES') {
+          const folderName = payload.folderName;
+          let notes = window.Store.getAllNotes();
+          let label = 'all notes';
+          
+          if (folderName) {
+             const allFolders = window.Store.getAllFolders();
+             const folder = allFolders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
+             if (folder) {
+                notes = notes.filter(n => n.folderId === folder.id);
+                label = `notes in "${folder.name}"`;
+             }
+          }
+          
+          // Build a summary for the chat
+          if (notes.length === 0) {
+             this._appendMessage('ai', `📋 No ${label} found.`);
+          } else {
+             const listHtml = notes.map((n, i) => 
+                `<b>${i + 1}.</b> ${n.title || 'Untitled'} <span style="color:var(--text-tertiary);font-size:12px;">(${(n.tags || []).join(', ') || 'no tags'})</span>`
+             ).join('<br>');
+             this._appendMessage('ai', `📋 <b>${notes.length} ${label}:</b><br>${listHtml}`);
+          }
+          window.showToast(`🤖 Listed ${notes.length} ${label}`, 'info');
+          return;
+       }
+
+       if (action === 'FILTER_BY_TAG') {
+          const tagName = (tags || payload.searchQuery || '').trim().toLowerCase().replace(/^#/, '');
+          if (tagName) {
+             // Click the tag in sidebar to filter
+             const tagEls = document.querySelectorAll('.tag-item');
+             let found = false;
+             tagEls.forEach(el => {
+                if ((el.textContent || '').toLowerCase().trim().replace(/^#/, '') === tagName) {
+                   el.click();
+                   found = true;
+                }
+             });
+             if (!found) {
+                // Manual filter via search
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) {
+                   searchInput.value = tagName;
+                   window.SearchManager.query = tagName;
+                   window.NoteList.render(true);
+                }
+             }
+             window.showToast(`🤖 Filtered by tag: ${tagName}`, 'success');
+          }
+          return;
+       }
+
+       if (action === 'SORT_NOTES') {
+          const c = (payload.searchQuery || text || 'newest').toLowerCase();
+          let sortBy = 'newest';
+          
+          if (c.includes('alpha') || c.includes('name') || c.includes('a-z') || c.includes('z-a')) {
+             if (c.includes('desc') || c.includes('z-a') || c.includes('reverse')) sortBy = 'alpha_desc';
+             else sortBy = 'alpha_asc';
+          } 
+          else if (c.includes('length') || c.includes('content') || c.includes('size')) {
+             if (c.includes('asc') || c.includes('shortest') || c.includes('reverse') || c.includes('small')) sortBy = 'length_asc';
+             else sortBy = 'length_desc';
+          }
+          else {
+             // date based or default (like "descending order")
+             if (c.includes('old') || (c.includes('asc') && !c.includes('desc'))) sortBy = 'oldest';
+             else sortBy = 'newest';
+          }
+          
+          window.Store.saveSetting('sortBy', sortBy);
+          window.NoteList.render(true);
+          window.showToast(`🤖 Notes sorted: ${sortBy}`, 'success');
+          return;
+       }
+
+       if (action === 'FIND_AND_UPDATE') {
+          const query = (payload.searchQuery || '').toLowerCase();
+          if (query) {
+             const allNotes = window.Store.getAllNotes();
+             const match = allNotes.find(n => (n.title || '').toLowerCase().includes(query))
+                || allNotes.find(n => window.Store.stripHtml(n.content || '').toLowerCase().includes(query));
+             
+             if (match) {
+                // Build update payload
+                const updates = {};
+                if (title) updates.title = title;
+                if (text) {
+                   // REPLACE the content entirely with the new rich content
+                   updates.content = this._sanitizeAgentHtml(text);
+                }
+                window.Store.updateNote(match.id, updates);
+                
+                // If this note is currently open in the editor, refresh it live
+                const currentOpenId = window.Editor ? window.Editor.getCurrentId() : null;
+                if (currentOpenId === match.id) {
+                   const editorBody = document.getElementById('editor-body');
+                   if (editorBody && updates.content) editorBody.innerHTML = updates.content;
+                   const editorTitle = document.getElementById('editor-title');
+                   if (editorTitle && updates.title) editorTitle.value = updates.title;
+                   window.Editor._scheduleAutoSave();
+                }
+                
+                window.NoteList.render();
+                window.showToast(`🤖 Updated: "${match.title}"`, 'success');
+             } else {
+                window.showToast(`🤖 No note found matching "${query}"`, 'warning');
+             }
+          }
+          return;
+       }
+
+       if (action === 'AUTO_ENHANCE_NOTE') {
+          const query = (payload.searchQuery || '').toLowerCase();
+          const instructions = payload.instructions;
+          if (query && instructions) {
+             const allNotes = window.Store.getAllNotes();
+             const match = allNotes.find(n => (n.title || '').toLowerCase().includes(query))
+                || allNotes.find(n => window.Store.stripHtml(n.content || '').toLowerCase().includes(query));
+             
+             if (match) {
+                // Determine a safe string context for the targeted note
+                let contextStr = `[METADATA: Title="${match.title}"]\n\n${match.content || ''}`;
+                window.showToast(`🤖 AI is enhancing "${match.title}" in the background...`, 'info', 3000);
+                
+                // Spawn a detached async sub-request strictly focused on rewriting this note
+                // Using the same endpoint but explicitly commanding it to replace_all
+                fetch(`${window.API_BASE_URL}/ai/agent`, {
+                   method: 'POST',
+                   headers: {
+                       'Content-Type': 'application/json',
+                       'Authorization': `Bearer ${window.Auth.getToken()}`
+                   },
+                   body: JSON.stringify({
+                       prompt: `ENHANCEMENT TASK: ${instructions}.\n\nCRITICAL CONTENT RULE: You MUST PRESERVE all existing informational content and structural meaning. Expand and enrich the content seamlessly, but DO NOT delete existing user data unless explicitly asked. Synthesize the new content intelligently around the old content.\nCRITICAL DESIGN RULE: NEVER wrap the document in global background colors or top-level inline styles. The editor handles global themes natively. Focus purely on clean, rich semantic HTML.\n\nOutput your response ONLY as an array containing a single {"action": "FIND_AND_UPDATE"} object replacing the entire note content with the newly enhanced rich HTML.`,
+                       context: contextStr
+                   })
+                }).then(res => res.json()).then(data => {
+                   if (data.agent && data.agent.actions && data.agent.actions.length > 0) {
+                       const updateAction = data.agent.actions.find(a => a.action === 'FIND_AND_UPDATE' || a.action === 'REPLACE_ALL');
+                       if (updateAction && updateAction.text) {
+                           const newHtml = this._sanitizeAgentHtml(updateAction.text);
+                           
+                           // Update store
+                           window.Store.updateNote(match.id, { content: newHtml });
+                           
+                           // If open, refresh live editor
+                           const currentOpenId = window.Editor ? window.Editor.getCurrentId() : null;
+                           if (currentOpenId === match.id) {
+                              const editorBody = document.getElementById('editor-body');
+                              if (editorBody) editorBody.innerHTML = newHtml;
+                              window.Editor._scheduleAutoSave();
+                           }
+                           
+                           window.NoteList.render();
+                           window.showToast(`✅ Successfully enhanced "${match.title}"!`, 'success');
+                       } else {
+                           window.showToast(`⚠️ AI failed to provide valid enhancement format for "${match.title}"`, 'warning');
+                       }
+                   }
+                }).catch(err => {
+                   console.error('Enhancement Sub-Agent Error:', err);
+                   window.showToast(`🧨 Failed to enhance "${match.title}"`, 'error');
+                });
+             } else {
+                window.showToast(`🤖 Couldn't find note "${payload.searchQuery}" to enhance`, 'warning');
+             }
+          }
+          return;
+       }
+
+       // Text manipulating actions (These rely on Range/execCommand modifying the active DOM)
+       if (!isActiveEditor && targetId) {
+          window.Editor.open(targetId);
+       }
+       
        const body = document.getElementById('editor-body');
        if (!body) return;
        
@@ -394,7 +990,31 @@
                 window.showToast('🤖 Could not find target text to format', 'warning');
              }
           }
-       } else if (action === 'REPLACE_ALL') {
+       } else if (action === 'TRANSLATE_TEXT') {
+          // Find the target text and replace it with the translated version
+          const { targetText } = payload;
+          if (targetText && text && window.find) {
+             body.focus();
+             const rng = document.createRange();
+             rng.selectNodeContents(body);
+             rng.collapse(true);
+             const sel = document.getSelection();
+             sel.removeAllRanges();
+             sel.addRange(rng);
+             const found = window.find(targetText, false, false, false, false, false, false);
+             if (found) {
+                const currentSel = window.getSelection();
+                if (currentSel.rangeCount > 0 && body.contains(currentSel.anchorNode)) {
+                   document.execCommand('insertText', false, text);
+                   window.Editor._scheduleAutoSave();
+                } else {
+                   window.showToast('🤖 Target text found outside editor', 'warning');
+                }
+             } else {
+                window.showToast('🤖 Could not find text to translate', 'warning');
+             }
+          }
+       } else if (action === 'REPLACE_ALL' || action === 'FIX_GRAMMAR') {
           let cleanHtml = parsedHtml
              .replace(/\[METADATA:[^\]]*\]\s*/gi, '')
              .replace(/(<br\s*\/?\s*>(\s*)){3,}/gi, '<br><br>')
@@ -408,7 +1028,28 @@
           rangeObj.selectNodeContents(body);
           document.getSelection().addRange(rangeObj);
           document.execCommand('insertHTML', false, cleanHtml);
-       } else if (action === 'APPEND_BOTTOM' || action === 'INSERT_IMAGE' || action === 'GENERATE_TABLE') {
+       } else if (action === 'INSERT_IMAGE' || action === 'GENERATE_TABLE' || action === 'GENERATE_LIST' || action === 'SUMMARIZE_INLINE' || action === 'INSERT_CODE_BLOCK' || action === 'INSERT_CHECKLIST' || action === 'INSERT_BLOCKQUOTE') {
+          // If the AI generated just a URL for an image, wrap it properly
+          let htmlToInsert = parsedHtml;
+          if (action === 'INSERT_IMAGE' && !parsedHtml.includes('<img')) {
+            const urlMatch = parsedHtml.match(/https?:\/\/[^\s"'<>\)]+/);
+            if (urlMatch) {
+              htmlToInsert = `<img src="${urlMatch[0]}" style="max-width:100%;border-radius:8px;margin:8px 0;"><p>&nbsp;</p>`;
+            }
+          }
+
+          if (window.Editor && window.Editor._restoreSelection) {
+            window.Editor._restoreSelection();
+          } else {
+            // Fallback to end if no selection saved
+            const rangeObj = document.createRange();
+            rangeObj.selectNodeContents(body);
+            rangeObj.collapse(false);
+            document.getSelection().removeAllRanges();
+            document.getSelection().addRange(rangeObj);
+          }
+          document.execCommand('insertHTML', false, htmlToInsert + '<p>&nbsp;</p>');
+       } else if (action === 'APPEND_BOTTOM') {
           const rangeObj = document.createRange();
           rangeObj.selectNodeContents(body);
           rangeObj.collapse(false); // end
@@ -426,7 +1067,7 @@
           document.execCommand('insertHTML', false, parsedHtml + '<br><br>');
        }
        
-       window.Editor._scheduleAutoSave();
+       if (window.Editor && window.Editor._scheduleAutoSave) window.Editor._scheduleAutoSave();
        window.showToast(`🤖 AI executed ${action}`, 'success');
     },
 
@@ -776,8 +1417,9 @@
     _sanitizeAgentHtml(text) {
       if (!text) return '';
       // For agent actions: the AI sends back raw HTML (tables, images, links).
-      // We must NOT escape angle brackets. Only do light cleanup.
+      // We must NOT escape angle brackets. Only do light cleanup and security formatting.
       return text
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')   // forcibly strip style block hallucinations causing global themes
         .replace(/\[METADATA:[^\]]*\]\s*/gi, '')         // strip leaked metadata
         .replace(/(<br\s*\/?>\s*){4,}/gi, '<br><br>')    // collapse excessive br
         .replace(/\\n/g, '\n')                           // unescape literal \n
